@@ -14,6 +14,9 @@
 Adafruit_NeoPixel pixels(NUM_PIXELS, RGB_PIN, NEO_GRB + NEO_KHZ800);
 Adafruit_USBD_MIDI usb_midi;
 MIDI_CREATE_INSTANCE(Adafruit_USBD_MIDI, usb_midi, MIDI_OBJ);
+// Puente de enlace global para que el nuevo módulo MPE acceda de forma limpia a la interfaz MIDI
+void* punteroMidiGlobal = (void*)&MIDI_OBJ;
+
 Adafruit_MPU6050 mpu;
 
 int ultimoMidiX = 0;
@@ -53,14 +56,14 @@ const int ADDR_MENU = 36;
 const int ADDR_MPE = ADDR_MENU + 56; // 92
 
 // 9. CONSTANTES DEL PROTOCOLO MPE
-const uint8_t MPE_CANAL_MAESTRO = 1;
-const uint8_t MPE_CANAL_MIEMBRO_MIN = 2;
-const uint8_t MPE_CANAL_MIEMBRO_MAX = 16;
-const uint8_t MPE_NUM_MIEMBROS = 15;
-const uint8_t MPE_CC_TIMBRE = 74;   // CC74: timbre en MPE
-const int MPE_PITCHBEND_CENTRO = 0; // la librería usa rango firmado -8192..+8191
-const int MPE_PITCHBEND_MIN = -8192;
-const int MPE_PITCHBEND_MAX = 8191;
+extern const uint8_t MPE_CANAL_MAESTRO = 1;
+extern const uint8_t MPE_CANAL_MIEMBRO_MIN = 2;
+extern const uint8_t MPE_CANAL_MIEMBRO_MAX = 16;
+extern const uint8_t MPE_NUM_MIEMBROS = 15;
+extern const uint8_t MPE_CC_TIMBRE = 74;   // CC74: timbre en MPE
+extern const int MPE_PITCHBEND_CENTRO = 0; // la librería usa rango firmado -8192..+8191
+extern const int MPE_PITCHBEND_MIN = -8192;
+extern const int MPE_PITCHBEND_MAX = 8191;
 
 ConfigMenu config = {
     .canalMidi = 1,
@@ -102,164 +105,6 @@ void setBoardColor(uint8_t r, uint8_t g, uint8_t b)
 {
     pixels.setPixelColor(0, pixels.Color(r, g, b));
     pixels.show();
-}
-
-void guardarLimpiosEnEEPROM()
-{
-    noInterrupts();
-    EEPROM.begin(128);
-    EEPROM.put(ADDR_CALIBRACION + 0, anguloCentroX);
-    EEPROM.put(ADDR_CALIBRACION + 4, anguloCentroY);
-    EEPROM.put(ADDR_CALIBRACION + 8, xMinLimit);
-    EEPROM.put(ADDR_CALIBRACION + 12, xMaxLimit);
-    EEPROM.put(ADDR_CALIBRACION + 16, yMinLimit);
-    EEPROM.put(ADDR_CALIBRACION + 20, yMaxLimit);
-    EEPROM.write(ADDR_FIRMA, 0xA5);
-    EEPROM.put(ADDR_MENU + 0, config.canalMidi);
-    EEPROM.put(ADDR_MENU + 4, config.numeroCC_X);
-    EEPROM.put(ADDR_MENU + 8, config.numeroCC_Y);
-    EEPROM.put(ADDR_MENU + 12, config.numeroCC_Z);
-    EEPROM.put(ADDR_MENU + 16, config.suavizadoAlpha);
-    EEPROM.put(ADDR_MENU + 20, config.zonaMuerta);
-    EEPROM.put(ADDR_MENU + 24, config.trillBarMinPresion);
-    EEPROM.put(ADDR_MENU + 28, config.trillBarMaxPresion);
-    EEPROM.put(ADDR_MENU + 32, config.trillBarCC_pos);
-    EEPROM.put(ADDR_MENU + 36, config.trillBarCC_pres);
-    EEPROM.put(ADDR_MENU + 40, config.trillSquareCC_X);
-    EEPROM.put(ADDR_MENU + 44, config.trillSquareCC_Y);
-    EEPROM.put(ADDR_MENU + 48, config.trillSquareCC_Z);
-    EEPROM.put(ADDR_MENU + 52, config.modoMidi); // Dirección 88: selector CC/MPE
-    EEPROM.put(ADDR_MPE + 0, config.mpeBarModo);
-    EEPROM.put(ADDR_MPE + 4, config.mpeEscala);
-    EEPROM.put(ADDR_MPE + 8, config.mpeNotaBase);
-    EEPROM.put(ADDR_MPE + 12, config.mpeRangoOctavas);
-    EEPROM.put(ADDR_MPE + 16, config.mpeSquareModo);
-    EEPROM.put(ADDR_MPE + 20, config.mpeSquareNota);
-    EEPROM.put(ADDR_MPE + 24, config.mpeVersion);
-
-    EEPROM.commit();
-    interrupts();
-}
-
-void cargarLimpiosDesdeEEPROM()
-{
-    noInterrupts();
-    EEPROM.begin(128);
-    byte firma = EEPROM.read(ADDR_FIRMA);
-    if (firma == 0xA5)
-    {
-        EEPROM.get(ADDR_CALIBRACION + 0, anguloCentroX);
-        EEPROM.get(ADDR_CALIBRACION + 4, anguloCentroY);
-        EEPROM.get(ADDR_CALIBRACION + 8, xMinLimit);
-        EEPROM.get(ADDR_CALIBRACION + 12, xMaxLimit);
-        EEPROM.get(ADDR_CALIBRACION + 16, yMinLimit);
-        EEPROM.get(ADDR_CALIBRACION + 20, yMaxLimit);
-        EEPROM.get(ADDR_MENU + 0, config.canalMidi);
-        EEPROM.get(ADDR_MENU + 4, config.numeroCC_X);
-        EEPROM.get(ADDR_MENU + 8, config.numeroCC_Y);
-        EEPROM.get(ADDR_MENU + 12, config.numeroCC_Z);
-        EEPROM.get(ADDR_MENU + 16, config.suavizadoAlpha);
-        EEPROM.get(ADDR_MENU + 20, config.zonaMuerta);
-        EEPROM.get(ADDR_MENU + 24, config.trillBarMinPresion);
-        EEPROM.get(ADDR_MENU + 28, config.trillBarMaxPresion);
-        EEPROM.get(ADDR_MENU + 32, config.trillBarCC_pos);
-        EEPROM.get(ADDR_MENU + 36, config.trillBarCC_pres);
-        EEPROM.get(ADDR_MENU + 40, config.trillSquareCC_X);
-        EEPROM.get(ADDR_MENU + 44, config.trillSquareCC_Y);
-        EEPROM.get(ADDR_MENU + 48, config.trillSquareCC_Z);
-        EEPROM.get(ADDR_MENU + 52, config.modoMidi);
-        EEPROM.get(ADDR_MPE + 0, config.mpeBarModo);
-        EEPROM.get(ADDR_MPE + 4, config.mpeEscala);
-        EEPROM.get(ADDR_MPE + 8, config.mpeNotaBase);
-        EEPROM.get(ADDR_MPE + 12, config.mpeRangoOctavas);
-        EEPROM.get(ADDR_MPE + 16, config.mpeSquareModo);
-        EEPROM.get(ADDR_MPE + 20, config.mpeSquareNota);
-        EEPROM.get(ADDR_MPE + 24, config.mpeVersion);
-
-        // ... (Aquí se quedan todas tus lecturas EEPROM.get normales de la calibración y el menú) ...
-
-        // ================================================================
-        // ESCUDO DE PROTECCIÓN INTEGRAL: AUTO-RECUPERACIÓN DE FÁBRICA
-        // ================================================================
-
-        // 1. Canal MIDI (Debe estar entre 1 y 16)
-        if (config.canalMidi < 1 || config.canalMidi > 16)
-        {
-            config.canalMidi = 1;
-        }
-
-        // 2. Controladores MIDI del Torso / Acelerómetro (Valores originales)
-        if (config.numeroCC_X < 0 || config.numeroCC_X > 127)
-            config.numeroCC_X = 16;
-        if (config.numeroCC_Y < 0 || config.numeroCC_Y > 127)
-            config.numeroCC_Y = 17;
-        if (config.numeroCC_Z < 0 || config.numeroCC_Z > 127)
-            config.numeroCC_Z = 18;
-
-        // 3. Parámetros del Filtro y Algoritmo del Torso
-        if (config.suavizadoAlpha < 5 || config.suavizadoAlpha > 99)
-            config.suavizadoAlpha = 50;
-        if (config.zonaMuerta < 0 || config.zonaMuerta > 30)
-            config.zonaMuerta = 5;
-
-        // 4. Calibración de Presión del Trill Bar
-        if (config.trillBarMinPresion <= 0)
-            config.trillBarMinPresion = 450;
-        if (config.trillBarMaxPresion <= 0)
-            config.trillBarMaxPresion = 6500;
-
-        // 5. Modo MIDI: solo se aceptan CC (0) o MPE (1).
-        // Valores antiguos/no inicializados vuelven al modo CC seguro.
-        if (config.modoMidi != 0 && config.modoMidi != 1)
-            config.modoMidi = 0;
-
-        // 6. Controladores MIDI del Pad Trill Square
-        if (config.trillSquareCC_X < 0 || config.trillSquareCC_X > 127)
-            config.trillSquareCC_X = 22;
-        if (config.trillSquareCC_Y < 0 || config.trillSquareCC_Y > 127)
-            config.trillSquareCC_Y = 23;
-        if (config.trillSquareCC_Z < 0 || config.trillSquareCC_Z > 127)
-            config.trillSquareCC_Z = 24;
-
-        // BLOQUE MPE
-        if (config.mpeVersion != 1)
-        {
-            config.mpeBarModo = 0;
-            config.mpeEscala = 0;
-            config.mpeNotaBase = 48;
-            config.mpeRangoOctavas = 2;
-            config.mpeSquareModo = 0;
-            config.mpeSquareNota = 48;
-            config.mpeVersion = 1;
-        }
-
-        // Validación de Rangos
-        if (config.mpeBarModo != 0 && config.mpeBarModo != 1)
-            config.mpeBarModo = 0;
-
-        // 9 escalas: 0..8
-        if (config.mpeEscala < 0 || config.mpeEscala > 8)
-            config.mpeEscala = 0;
-
-        if (config.mpeNotaBase < 0 || config.mpeNotaBase > 127)
-            config.mpeNotaBase = 48;
-
-        if (config.mpeRangoOctavas < 1 || config.mpeRangoOctavas > 4)
-            config.mpeRangoOctavas = 2;
-
-        if (config.mpeSquareModo != 0 && config.mpeSquareModo != 1)
-            config.mpeSquareModo = 0;
-
-        if (config.mpeSquareNota < 0 || config.mpeSquareNota > 127)
-            config.mpeSquareNota = 48;
-    }
-    else
-    {
-        interrupts();
-        guardarLimpiosEnEEPROM();
-        return;
-    }
-    interrupts();
 }
 
 void iniciarCalibracionDinamica()
@@ -698,7 +543,165 @@ void mpeConfigurarZona(uint8_t canalesMiembro,
 }
 // - //////////- FIN ZONA MPE - ///////////////////////////////////
 
-// FAse2
-//uint8_t rangoBar = (uint8_t)(config.mpeRangoOctavas * 12);
-//mpeConfigurarZona(MPE_NUM_MIEMBROS, 2, rangoBar);
+// GUARDA DATOS EEPROM
+void guardarLimpiosEnEEPROM()
+{
+    noInterrupts();
+    EEPROM.begin(128);
+    EEPROM.put(ADDR_CALIBRACION + 0, anguloCentroX);
+    EEPROM.put(ADDR_CALIBRACION + 4, anguloCentroY);
+    EEPROM.put(ADDR_CALIBRACION + 8, xMinLimit);
+    EEPROM.put(ADDR_CALIBRACION + 12, xMaxLimit);
+    EEPROM.put(ADDR_CALIBRACION + 16, yMinLimit);
+    EEPROM.put(ADDR_CALIBRACION + 20, yMaxLimit);
+    EEPROM.write(ADDR_FIRMA, 0xA5);
+    EEPROM.put(ADDR_MENU + 0, config.canalMidi);
+    EEPROM.put(ADDR_MENU + 4, config.numeroCC_X);
+    EEPROM.put(ADDR_MENU + 8, config.numeroCC_Y);
+    EEPROM.put(ADDR_MENU + 12, config.numeroCC_Z);
+    EEPROM.put(ADDR_MENU + 16, config.suavizadoAlpha);
+    EEPROM.put(ADDR_MENU + 20, config.zonaMuerta);
+    EEPROM.put(ADDR_MENU + 24, config.trillBarMinPresion);
+    EEPROM.put(ADDR_MENU + 28, config.trillBarMaxPresion);
+    EEPROM.put(ADDR_MENU + 32, config.trillBarCC_pos);
+    EEPROM.put(ADDR_MENU + 36, config.trillBarCC_pres);
+    EEPROM.put(ADDR_MENU + 40, config.trillSquareCC_X);
+    EEPROM.put(ADDR_MENU + 44, config.trillSquareCC_Y);
+    EEPROM.put(ADDR_MENU + 48, config.trillSquareCC_Z);
+    EEPROM.put(ADDR_MENU + 52, config.modoMidi); // Dirección 88: selector CC/MPE
+    EEPROM.put(ADDR_MPE + 0, config.mpeBarModo);
+    EEPROM.put(ADDR_MPE + 4, config.mpeEscala);
+    EEPROM.put(ADDR_MPE + 8, config.mpeNotaBase);
+    EEPROM.put(ADDR_MPE + 12, config.mpeRangoOctavas);
+    EEPROM.put(ADDR_MPE + 16, config.mpeSquareModo);
+    EEPROM.put(ADDR_MPE + 20, config.mpeSquareNota);
+    EEPROM.put(ADDR_MPE + 24, config.mpeVersion);
+
+    EEPROM.commit();
+    interrupts();
+}
+// - //////////////////// - FIN GUARDA EEPROM - ///////////////
+
+// Carga desde EEPROM
+void cargarLimpiosDesdeEEPROM()
+{
+    noInterrupts();
+    EEPROM.begin(128);
+    byte firma = EEPROM.read(ADDR_FIRMA);
+    if (firma == 0xA5)
+    {
+        EEPROM.get(ADDR_CALIBRACION + 0, anguloCentroX);
+        EEPROM.get(ADDR_CALIBRACION + 4, anguloCentroY);
+        EEPROM.get(ADDR_CALIBRACION + 8, xMinLimit);
+        EEPROM.get(ADDR_CALIBRACION + 12, xMaxLimit);
+        EEPROM.get(ADDR_CALIBRACION + 16, yMinLimit);
+        EEPROM.get(ADDR_CALIBRACION + 20, yMaxLimit);
+        EEPROM.get(ADDR_MENU + 0, config.canalMidi);
+        EEPROM.get(ADDR_MENU + 4, config.numeroCC_X);
+        EEPROM.get(ADDR_MENU + 8, config.numeroCC_Y);
+        EEPROM.get(ADDR_MENU + 12, config.numeroCC_Z);
+        EEPROM.get(ADDR_MENU + 16, config.suavizadoAlpha);
+        EEPROM.get(ADDR_MENU + 20, config.zonaMuerta);
+        EEPROM.get(ADDR_MENU + 24, config.trillBarMinPresion);
+        EEPROM.get(ADDR_MENU + 28, config.trillBarMaxPresion);
+        EEPROM.get(ADDR_MENU + 32, config.trillBarCC_pos);
+        EEPROM.get(ADDR_MENU + 36, config.trillBarCC_pres);
+        EEPROM.get(ADDR_MENU + 40, config.trillSquareCC_X);
+        EEPROM.get(ADDR_MENU + 44, config.trillSquareCC_Y);
+        EEPROM.get(ADDR_MENU + 48, config.trillSquareCC_Z);
+        EEPROM.get(ADDR_MENU + 52, config.modoMidi);
+        EEPROM.get(ADDR_MPE + 0, config.mpeBarModo);
+        EEPROM.get(ADDR_MPE + 4, config.mpeEscala);
+        EEPROM.get(ADDR_MPE + 8, config.mpeNotaBase);
+        EEPROM.get(ADDR_MPE + 12, config.mpeRangoOctavas);
+        EEPROM.get(ADDR_MPE + 16, config.mpeSquareModo);
+        EEPROM.get(ADDR_MPE + 20, config.mpeSquareNota);
+        EEPROM.get(ADDR_MPE + 24, config.mpeVersion);
+
+        // ... (Aquí se quedan todas tus lecturas EEPROM.get normales de la calibración y el menú) ...
+
+        // ================================================================
+        // ESCUDO DE PROTECCIÓN INTEGRAL: AUTO-RECUPERACIÓN DE FÁBRICA
+        // ================================================================
+
+        // 1. Canal MIDI (Debe estar entre 1 y 16)
+        if (config.canalMidi < 1 || config.canalMidi > 16)
+        {
+            config.canalMidi = 1;
+        }
+
+        // 2. Controladores MIDI del Torso / Acelerómetro (Valores originales)
+        if (config.numeroCC_X < 0 || config.numeroCC_X > 127)
+            config.numeroCC_X = 16;
+        if (config.numeroCC_Y < 0 || config.numeroCC_Y > 127)
+            config.numeroCC_Y = 17;
+        if (config.numeroCC_Z < 0 || config.numeroCC_Z > 127)
+            config.numeroCC_Z = 18;
+
+        // 3. Parámetros del Filtro y Algoritmo del Torso
+        if (config.suavizadoAlpha < 5 || config.suavizadoAlpha > 99)
+            config.suavizadoAlpha = 50;
+        if (config.zonaMuerta < 0 || config.zonaMuerta > 30)
+            config.zonaMuerta = 5;
+
+        // 4. Calibración de Presión del Trill Bar
+        if (config.trillBarMinPresion <= 0)
+            config.trillBarMinPresion = 450;
+        if (config.trillBarMaxPresion <= 0)
+            config.trillBarMaxPresion = 6500;
+
+        // 5. Modo MIDI: solo se aceptan CC (0) o MPE (1).
+        // Valores antiguos/no inicializados vuelven al modo CC seguro.
+        if (config.modoMidi != 0 && config.modoMidi != 1)
+            config.modoMidi = 0;
+
+        // 6. Controladores MIDI del Pad Trill Square
+        if (config.trillSquareCC_X < 0 || config.trillSquareCC_X > 127)
+            config.trillSquareCC_X = 22;
+        if (config.trillSquareCC_Y < 0 || config.trillSquareCC_Y > 127)
+            config.trillSquareCC_Y = 23;
+        if (config.trillSquareCC_Z < 0 || config.trillSquareCC_Z > 127)
+            config.trillSquareCC_Z = 24;
+
+        // BLOQUE MPE
+        if (config.mpeVersion != 1)
+        {
+            config.mpeBarModo = 0;
+            config.mpeEscala = 0;
+            config.mpeNotaBase = 48;
+            config.mpeRangoOctavas = 2;
+            config.mpeSquareModo = 0;
+            config.mpeSquareNota = 48;
+            config.mpeVersion = 1;
+        }
+
+        // Validación de Rangos
+        if (config.mpeBarModo != 0 && config.mpeBarModo != 1)
+            config.mpeBarModo = 0;
+
+        // 9 escalas: 0..8
+        if (config.mpeEscala < 0 || config.mpeEscala > 8)
+            config.mpeEscala = 0;
+
+        if (config.mpeNotaBase < 0 || config.mpeNotaBase > 127)
+            config.mpeNotaBase = 48;
+
+        if (config.mpeRangoOctavas < 1 || config.mpeRangoOctavas > 4)
+            config.mpeRangoOctavas = 2;
+
+        if (config.mpeSquareModo != 0 && config.mpeSquareModo != 1)
+            config.mpeSquareModo = 0;
+
+        if (config.mpeSquareNota < 0 || config.mpeSquareNota > 127)
+            config.mpeSquareNota = 48;
+    }
+    else
+    {
+        interrupts();
+        guardarLimpiosEnEEPROM();
+        return;
+    }
+    interrupts();
+}
+// - ///////////// - FIN CARGA LIMPIA EEPROM - ///////////
 

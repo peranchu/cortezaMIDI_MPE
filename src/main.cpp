@@ -48,19 +48,6 @@ void setup()
     inicializarTrillSquare();
 
     // PRUEBA
-    /* if (config.modoMidi == 1)
-    {
-        mpeConfigurarZona(MPE_NUM_MIEMBROS, 2, config.mpeRangoOctavas * 12);
-        delay(50);
-        mpeEnviarPitchBendNormalizado(0.0f, 2);
-        mpeEnviarTimbre(64, 2);
-        mpeEnviarPresionCanal(40, 2);
-        mpeEnviarNotaOn(60, 100, 2);
-        delay(500);
-        mpeEnviarPresionCanal(0, 2);
-        mpeEnviarNotaOff(60, 0, 2);
-        mpeDesactivarZona();
-    } */
 }
 
 void loop()

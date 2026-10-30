@@ -41,15 +41,15 @@ void ui_manejarClickCorto()
   // ================================================================
   if (pantallaActiva == PANTALLA_CALIBRADO_TRILL_BAR)
   {
-     // 1. Avisamos al sistema de que estamos calibrando para bloquear interferencias
+    // 1. Avisamos al sistema de que estamos calibrando para bloquear interferencias
     // (Si usas la variable calibracionEnProgreso que se ve en tu encoder, la activamos aquí)
-    calibracionEnProgreso_Bar = true; 
+    calibracionEnProgreso_Bar = true;
 
     // 2. Ejecutamos el asistente interactivo de la barra
     calibrarTrillBarDinamico();
 
-     // 3. ¡SOLO AL TERMINAR! Cambiamos la variable de pantalla al Home (Índice 0)
-    pantallaActiva = PANTALLA_CALIBRADO_TRILL_BAR; 
+    // 3. ¡SOLO AL TERMINAR! Cambiamos la variable de pantalla al Home (Índice 0)
+    pantallaActiva = PANTALLA_CALIBRADO_TRILL_BAR;
 
     // 4. Liberamos los bloqueos y forzamos el redibujado limpio del Home
     calibracionEnProgreso_Bar = false;
@@ -165,33 +165,66 @@ void verificarUI()
 
     if (!modoEdicionActivo && !calibracionEnProgreso)
     {
+      // Avanzamos de 1 en 1 de forma natural con el encoder fino
       int nuevaPantalla = (int)pantallaActiva + diferencia;
-      if (nuevaPantalla >= TOTAL_PANTALLAS)
-        nuevaPantalla = 0;
-      if (nuevaPantalla < 0)
-        nuevaPantalla = TOTAL_PANTALLAS - 1;
 
-      // ================================================================
-      // DESVÍO DE SEGURIDAD SIMÉTRICO PARA NAVEGACIÓN CÍCLICA
-      // ================================================================
+      // 🚧 FILTRADO POR BLOQUES GEOMÉTRICOS DEL ENUM
+      if (config.modoMidi == 1) 
+      {
+        // 🔸 MODO MPE: El menú termina en PANTALLA_MPE_BAR_NOTA. 
+        // Si intentas avanzar más a la derecha, te manda directo a HOME.
+        if (nuevaPantalla > PANTALLA_MPE_BAR_NOTA) {
+          nuevaPantalla = PANTALLA_HOME;
+        }
+        // Si retrocedes hacia la izquierda por debajo de HOME, va directo a la última de MPE.
+        if (nuevaPantalla < PANTALLA_HOME) {
+          nuevaPantalla = PANTALLA_MPE_BAR_NOTA;
+        }
+      }
+      else 
+      {
+        // 🔹 MODO CC TRADICIONAL: Debe saltarse el bloque MPE que está en medio.
+        if (diferencia > 0) 
+        {
+          // Si vas a la derecha y saltas de MODO_MIDI a la zona MPE, te catapulto directo a los CCs
+          if (nuevaPantalla > PANTALLA_MODO_MIDI && nuevaPantalla < PANTALLA_CC_X) {
+            nuevaPantalla = PANTALLA_CC_X;
+          }
+          // Límite superior del menú: da la vuelta a HOME
+          if (nuevaPantalla >= TOTAL_PANTALLAS) {
+            nuevaPantalla = PANTALLA_HOME;
+          }
+        }
+        else 
+        {
+          // Si vas a la izquierda y retrocedes desde los CCs hacia la zona MPE, te devuelvo a MODO_MIDI
+          if (nuevaPantalla < PANTALLA_CC_X && nuevaPantalla > PANTALLA_MODO_MIDI) {
+            nuevaPantalla = PANTALLA_MODO_MIDI;
+          }
+          // Límite inferior desde HOME: te manda al final absoluto del menú CC
+          if (nuevaPantalla < PANTALLA_HOME) {
+            nuevaPantalla = TOTAL_PANTALLAS - 1;
+          }
+        }
+      }
+
+      // 🔄 Tu desvío de seguridad original e intacto para la calibración
       if (nuevaPantalla == PANTALLA_CALIBRANDO)
       {
         if (pantallaActiva == PANTALLA_ZONA_MUERTA && diferencia > 0)
-        {
           nuevaPantalla = PANTALLA_CALIBRADO_TRILL_BAR;
-        }
         else if (pantallaActiva == PANTALLA_CALIBRADO_TRILL_BAR && diferencia < 0)
-        {
           nuevaPantalla = PANTALLA_ZONA_MUERTA;
-        }
       }
+      
       pantallaActiva = (PantallaActual)nuevaPantalla;
     }
+
     else if (modoEdicionActivo)
     {
       switch (pantallaActiva)
       {
-      case PANTALLA_MODO_MIDI:
+       case PANTALLA_MODO_MIDI:
         // Cada paso del encoder alterna entre CC (0) y MPE (1).
         if ((abs(diferencia) % 2) == 1)
           config.modoMidi = (config.modoMidi == 0) ? 1 : 0;
@@ -199,90 +232,82 @@ void verificarUI()
 
       case PANTALLA_CANAL:
         config.canalMidi += diferencia;
-        if (config.canalMidi > 16)
-          config.canalMidi = 1;
-        if (config.canalMidi < 1)
-          config.canalMidi = 16;
+        if (config.canalMidi > 16) config.canalMidi = 1;
+        if (config.canalMidi < 1)  config.canalMidi = 16;
         break;
 
       case PANTALLA_CC_X:
         config.numeroCC_X += diferencia;
-        if (config.numeroCC_X > 127)
-          config.numeroCC_X = 1;
-        if (config.numeroCC_X < 1)
-          config.numeroCC_X = 127;
+        if (config.numeroCC_X > 127) config.numeroCC_X = 1;
+        if (config.numeroCC_X < 1)   config.numeroCC_X = 127;
         break;
 
       case PANTALLA_CC_Y:
         config.numeroCC_Y += diferencia;
-        if (config.numeroCC_Y > 127)
-          config.numeroCC_Y = 1;
-        if (config.numeroCC_Y < 1)
-          config.numeroCC_Y = 127;
+        if (config.numeroCC_Y > 127) config.numeroCC_Y = 1;
+        if (config.numeroCC_Y < 1)   config.numeroCC_Y = 127;
         break;
 
       case PANTALLA_CC_Z:
         config.numeroCC_Z += diferencia;
-        if (config.numeroCC_Z > 127)
-          config.numeroCC_Z = 1;
-        if (config.numeroCC_Z < 1)
-          config.numeroCC_Z = 127;
+        if (config.numeroCC_Z > 127) config.numeroCC_Z = 1;
+        if (config.numeroCC_Z < 1)   config.numeroCC_Z = 127;
         break;
 
-      case PANTALLA_SQUARE_CC_X:
-        config.trillSquareCC_X += diferencia;
-        if (config.trillSquareCC_X > 127)
-          config.trillSquareCC_X = 1;
-        if (config.trillSquareCC_X < 1)
-          config.trillSquareCC_X = 127;
-        break;
-
-      case PANTALLA_SQUARE_CC_Y:
-        config.trillSquareCC_Y += diferencia;
-        if (config.trillSquareCC_Y > 127)
-          config.trillSquareCC_Y = 1;
-        if (config.trillSquareCC_Y < 1)
-          config.trillSquareCC_Y = 127;
-        break;
-
-      case PANTALLA_SQUARE_CC_Z:
-        config.trillSquareCC_Z += diferencia;
-        if (config.trillSquareCC_Z > 127)
-          config.trillSquareCC_Z = 1;
-        if (config.trillSquareCC_Z < 1)
-          config.trillSquareCC_Z = 127;
-        break;
-
-      case PANTALLA_SUAVIZADO:
-        config.suavizadoAlpha += (diferencia * 5);
-        if (config.suavizadoAlpha > 99)
-          config.suavizadoAlpha = 5;
-        if (config.suavizadoAlpha < 5)
-          config.suavizadoAlpha = 99;
-        break;
-
-      case PANTALLA_ZONA_MUERTA:
-        config.zonaMuerta += diferencia;
-        if (config.zonaMuerta > 30)
-          config.zonaMuerta = 0;
-        if (config.zonaMuerta < 0)
-          config.zonaMuerta = 30;
-        break;
-
+      // 🔄 SUBIDAS AQUÍ PARA COINCIDIR CON TU ENUM REAL
       case PANTALLA_CC_TRB_POS:
         config.trillBarCC_pos += diferencia;
-        if (config.trillBarCC_pos > 127)
-          config.trillBarCC_pos = 1;
-        if (config.trillBarCC_pos < 1)
-          config.trillBarCC_pos = 127;
+        if (config.trillBarCC_pos > 127) config.trillBarCC_pos = 1;
+        if (config.trillBarCC_pos < 1)   config.trillBarCC_pos = 127;
         break;
 
       case PANTALLA_CC_TRB_PRES:
         config.trillBarCC_pres += diferencia;
-        if (config.trillBarCC_pres > 127)
-          config.trillBarCC_pres = 1;
-        if (config.trillBarCC_pres < 1)
-          config.trillBarCC_pres = 127;
+        if (config.trillBarCC_pres > 127) config.trillBarCC_pres = 1;
+        if (config.trillBarCC_pres < 1)   config.trillBarCC_pres = 127;
+        break;
+
+      case PANTALLA_SQUARE_CC_X:
+        config.trillSquareCC_X += diferencia;
+        if (config.trillSquareCC_X > 127) config.trillSquareCC_X = 1;
+        if (config.trillSquareCC_X < 1)   config.trillSquareCC_X = 127;
+        break;
+
+      case PANTALLA_SQUARE_CC_Y:
+        config.trillSquareCC_Y += diferencia;
+        if (config.trillSquareCC_Y > 127) config.trillSquareCC_Y = 1;
+        if (config.trillSquareCC_Y < 1)   config.trillSquareCC_Y = 127;
+        break;
+
+      case PANTALLA_SQUARE_CC_Z:
+        config.trillSquareCC_Z += diferencia;
+        if (config.trillSquareCC_Z > 127) config.trillSquareCC_Z = 1;
+        if (config.trillSquareCC_Z < 1)   config.trillSquareCC_Z = 127;
+        break;
+
+      case PANTALLA_SUAVIZADO:
+        config.suavizadoAlpha += (diferencia * 5);
+        if (config.suavizadoAlpha > 99) config.suavizadoAlpha = 5;
+        if (config.suavizadoAlpha < 5)  config.suavizadoAlpha = 99;
+        break;
+
+      case PANTALLA_ZONA_MUERTA:
+        config.zonaMuerta += diferencia;
+        if (config.zonaMuerta > 30) config.zonaMuerta = 0;
+        if (config.zonaMuerta < 0)  config.zonaMuerta = 30;
+        break;
+
+      // 🔹 AGREGADAS LAS TRES PANTALLAS MPE QUE FALTABAN EN ESTE SWITCH
+      case PANTALLA_MPE_BAR_MODO:
+        // Lógica de edición para tus parámetros MPE (ej: alternar continuo/cuantizado)
+        break;
+
+      case PANTALLA_MPE_BAR_OCTAVAS:
+        // Lógica de edición para rango de octavas MPE
+        break;
+
+      case PANTALLA_MPE_BAR_NOTA:
+        // Lógica de edición para nota base MPE
         break;
 
       default:
@@ -335,7 +360,7 @@ void verificarUI()
     u8g2.firstPage();
     do
     {
-      char bufferTexto[24];
+      char bufferTexto[32]; // Buffer de espacio seguro para las cadenas de texto
       int anchoBarraX = 0, anchoBarraY = 0, anchoBarraZ = 0;
 
       if (modoEdicionActivo)
@@ -353,7 +378,12 @@ void verificarUI()
         // 1. CABECERA (Tu diseño original intacto)
         // ================================================================
         u8g2.setFont(u8g2_font_6x12_tr);
-        u8g2.drawStr(5, 10, "MIDI CORTEZA");
+        u8g2.drawStr(2, 10, "CORTEZA MIDI");
+
+        // 🔬 EL CHIVATO DE CONTROL: Pintamos el valor real de la variable en la esquina
+        snprintf(bufferTexto, sizeof(bufferTexto), "M:%d", config.modoMidi);
+        u8g2.drawStr(80, 10, bufferTexto); 
+
         snprintf(bufferTexto, sizeof(bufferTexto), "CH:%d", config.canalMidi);
         u8g2.drawStr(95, 10, bufferTexto);
         u8g2.drawHLine(0, 13, 128);
@@ -395,7 +425,7 @@ void verificarUI()
         // 🔄 DINÁMICO: Formateamos la etiqueta para incluir el CC real de la memoria
         snprintf(bufferTexto, sizeof(bufferTexto), "BP(CC%d)", config.trillBarCC_pos); // 👈 Ajusta el nombre si tu variable del struct se llama diferente
         u8g2.drawStr(5, 53, bufferTexto);
-       
+
         u8g2.drawFrame(45, 47, 40, 7); // Mismo grosor estético que las del torso (7px)
         if (anchoBarraTrillBarPos > 0)
         {
@@ -430,7 +460,7 @@ void verificarUI()
         int posYFinal = 17 + 2 + (29 - puntoY);
 
         u8g2.drawDisc(posXFinal, posYFinal, 2); // Dedo tocando
-       
+
         // Barra de presión (Z) del Trill Square situada abajo del todo, alineada con B-PRE
         int anchoZ = map(squareMidiZActual, 0, 127, 0, 31);
         u8g2.drawFrame(92, 57, 35, 7); // Caja de presión del Square estilizada de 7px de alto
@@ -699,6 +729,55 @@ void verificarUI()
         u8g2.drawStr(15, 56, bufferTexto);
         break;
       }
+
+      // ================================================================
+      // 🆕 RENDERIZADO GRÁFICO PANTALLAS MPE DE LA BARRA (CORREGIDO)
+      // ================================================================
+      case PANTALLA_MPE_BAR_MODO:
+        u8g2.setFont(u8g2_font_7x14_tf);
+        u8g2.drawStr(10, 22, "MPE BAR MODO");
+        u8g2.drawHLine(10, 26, 110);
+
+        u8g2.setFont(u8g2_font_6x12_tr);
+        if (config.mpeBarModo == 0)
+        {
+          u8g2.drawStr(20, 48, "> CONTINUO (Ribbon)");
+        }
+        else
+        {
+          u8g2.drawStr(20, 48, "> CUANTIZADO (Keys)");
+        }
+        break;
+
+      case PANTALLA_MPE_BAR_OCTAVAS:
+        u8g2.setFont(u8g2_font_7x14_tf);
+        u8g2.drawStr(10, 22, "MPE BAR RANGO");
+        u8g2.drawHLine(10, 26, 110);
+
+        u8g2.setFont(u8g2_font_6x12_tr);
+
+        char textoOctavas[24]; // 🔹 Array de 24 bytes seguro
+        snprintf(textoOctavas, sizeof(textoOctavas), "Octavas: %d", config.mpeRangoOctavas);
+        u8g2.drawStr(20, 48, textoOctavas);
+
+        break;
+
+      case PANTALLA_MPE_BAR_NOTA:
+      {
+        u8g2.setFont(u8g2_font_7x14_tf);
+        u8g2.drawStr(10, 22, "MPE BAR NOTA BASE");
+        u8g2.drawHLine(10, 26, 110);
+
+        u8g2.setFont(u8g2_font_6x12_tr);
+        int octavaVisual = (config.mpeNotaBase / 12) - 1;
+        const char *nombresNotas[] = {"C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"};
+
+        char textoNota[24]; // 🔹 Array de 24 bytes seguro
+        snprintf(textoNota, sizeof(textoNota), "Nota: %s%d (MIDI %d)",
+                 nombresNotas[config.mpeNotaBase % 12], octavaVisual, config.mpeNotaBase);
+        u8g2.drawStr(15, 48, textoNota);
+      }
+      break;
       }
     } while (u8g2.nextPage());
   }
