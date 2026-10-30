@@ -46,8 +46,21 @@ const float DEADZONE_Y = 2.0f; // ±2 grados de margen izquierda/derecha
 const float DEADZONE_Z = 3.0f; // ±3 grados de margen para la rotación (un poco más libre)
 
 const int ADDR_CALIBRACION = 0;
+
+// Gestiona Las Posiciones de la Memoria EEPROM
 const int ADDR_FIRMA = 32;
 const int ADDR_MENU = 36;
+const int ADDR_MPE = ADDR_MENU + 56; // 92
+
+// 9. CONSTANTES DEL PROTOCOLO MPE
+const uint8_t MPE_CANAL_MAESTRO = 1;
+const uint8_t MPE_CANAL_MIEMBRO_MIN = 2;
+const uint8_t MPE_CANAL_MIEMBRO_MAX = 16;
+const uint8_t MPE_NUM_MIEMBROS = 15;
+const uint8_t MPE_CC_TIMBRE = 74;   // CC74: timbre en MPE
+const int MPE_PITCHBEND_CENTRO = 0; // la librería usa rango firmado -8192..+8191
+const int MPE_PITCHBEND_MIN = -8192;
+const int MPE_PITCHBEND_MAX = 8191;
 
 ConfigMenu config = {
     .canalMidi = 1,
@@ -63,7 +76,14 @@ ConfigMenu config = {
     .zonaMuerta = 5,
     .trillBarMinPresion = 450,
     .trillBarMaxPresion = 6500,
-    .modoMidi = 0, // Por seguridad, arrancar siempre en el modo CC actual
+    .modoMidi = 0,        // Por seguridad, arrancar siempre en el modo CC actual
+    .mpeBarModo = 0,      // arrancar en continuo
+    .mpeEscala = 0,       // escala mayor
+    .mpeNotaBase = 48,    // C3
+    .mpeRangoOctavas = 2, // 2 octavas
+    .mpeSquareModo = 0,   // Y selecciona la nota
+    .mpeSquareNota = 48,  // C3 si se usa nota fija
+    .mpeVersion = 1,
 };
 
 bool calibracionEnProgreso = false;
@@ -109,6 +129,13 @@ void guardarLimpiosEnEEPROM()
     EEPROM.put(ADDR_MENU + 44, config.trillSquareCC_Y);
     EEPROM.put(ADDR_MENU + 48, config.trillSquareCC_Z);
     EEPROM.put(ADDR_MENU + 52, config.modoMidi); // Dirección 88: selector CC/MPE
+    EEPROM.put(ADDR_MPE + 0, config.mpeBarModo);
+    EEPROM.put(ADDR_MPE + 4, config.mpeEscala);
+    EEPROM.put(ADDR_MPE + 8, config.mpeNotaBase);
+    EEPROM.put(ADDR_MPE + 12, config.mpeRangoOctavas);
+    EEPROM.put(ADDR_MPE + 16, config.mpeSquareModo);
+    EEPROM.put(ADDR_MPE + 20, config.mpeSquareNota);
+    EEPROM.put(ADDR_MPE + 24, config.mpeVersion);
 
     EEPROM.commit();
     interrupts();
@@ -141,6 +168,13 @@ void cargarLimpiosDesdeEEPROM()
         EEPROM.get(ADDR_MENU + 44, config.trillSquareCC_Y);
         EEPROM.get(ADDR_MENU + 48, config.trillSquareCC_Z);
         EEPROM.get(ADDR_MENU + 52, config.modoMidi);
+        EEPROM.get(ADDR_MPE + 0, config.mpeBarModo);
+        EEPROM.get(ADDR_MPE + 4, config.mpeEscala);
+        EEPROM.get(ADDR_MPE + 8, config.mpeNotaBase);
+        EEPROM.get(ADDR_MPE + 12, config.mpeRangoOctavas);
+        EEPROM.get(ADDR_MPE + 16, config.mpeSquareModo);
+        EEPROM.get(ADDR_MPE + 20, config.mpeSquareNota);
+        EEPROM.get(ADDR_MPE + 24, config.mpeVersion);
 
         // ... (Aquí se quedan todas tus lecturas EEPROM.get normales de la calibración y el menú) ...
 
@@ -186,6 +220,38 @@ void cargarLimpiosDesdeEEPROM()
             config.trillSquareCC_Y = 23;
         if (config.trillSquareCC_Z < 0 || config.trillSquareCC_Z > 127)
             config.trillSquareCC_Z = 24;
+
+        // BLOQUE MPE
+        if (config.mpeVersion != 1)
+        {
+            config.mpeBarModo = 0;
+            config.mpeEscala = 0;
+            config.mpeNotaBase = 48;
+            config.mpeRangoOctavas = 2;
+            config.mpeSquareModo = 0;
+            config.mpeSquareNota = 48;
+            config.mpeVersion = 1;
+        }
+
+        // Validación de Rangos
+        if (config.mpeBarModo != 0 && config.mpeBarModo != 1)
+            config.mpeBarModo = 0;
+
+        // 9 escalas: 0..8
+        if (config.mpeEscala < 0 || config.mpeEscala > 8)
+            config.mpeEscala = 0;
+
+        if (config.mpeNotaBase < 0 || config.mpeNotaBase > 127)
+            config.mpeNotaBase = 48;
+
+        if (config.mpeRangoOctavas < 1 || config.mpeRangoOctavas > 4)
+            config.mpeRangoOctavas = 2;
+
+        if (config.mpeSquareModo != 0 && config.mpeSquareModo != 1)
+            config.mpeSquareModo = 0;
+
+        if (config.mpeSquareNota < 0 || config.mpeSquareNota > 127)
+            config.mpeSquareNota = 48;
     }
     else
     {
@@ -248,7 +314,7 @@ void ejecutarCalibracionDinamica()
 
 void inicializarHardware()
 {
-    //I2C0
+    // I2C0
     Wire.setSDA(4);
     Wire.setSCL(5);
     Wire.begin();
@@ -288,6 +354,7 @@ void inicializarHardware()
     }
 }
 
+// ENVIO Y EVALUACIÓN MENSAJES MIDI CC
 void enviarMensajeCC(unsigned char numeroCC, unsigned char valor, unsigned char canal)
 {
     MIDI_OBJ.sendControlChange(numeroCC, valor, canal);
@@ -301,7 +368,9 @@ void evaluarYEnviarCC(unsigned char numeroCC, int valorActual, int &valorEnviado
         enviarMensajeCC(numeroCC, (unsigned char)valorActual, canal);
     }
 }
+// - /////////// - FIN ENVIO Y VALIDACIÓN MIDI CC - //////////////////////////////////////
 
+// PROCESADO DATOS PARA CONVERTIRLOS MIDI MODO CC
 void procesarDatos(DatosSensor datos)
 {
     unsigned long currentTime = micros();
@@ -391,7 +460,9 @@ void procesarDatos(DatosSensor datos)
     evaluarYEnviarCC((unsigned char)config.numeroCC_Y, ultimoMidiY, enviadoY, (unsigned char)config.canalMidi);
     evaluarYEnviarCC((unsigned char)config.numeroCC_Z, ultimoMidiZ, enviadoZ, (unsigned char)config.canalMidi);
 }
+// -////////// - FIN PROCESADO DATOS ENVIO CC - /////////////////////////////
 
+// LECTURA DATOS ACELERÓMETRO
 DatosSensor leerSensor(void)
 {
     DatosSensor datos = {0};
@@ -420,7 +491,9 @@ DatosSensor leerSensor(void)
     // Devolvemos la estructura para que main.cpp no proteste
     return datos;
 }
+// - ///////// - FIN LECTURA DATOS ACELEROMETRO - ///////////////////////////
 
+// ESTADO CONEXIÓN ACELERÓMETRO
 void verificarEstadoConexion()
 {
     if (!mpu_detectado)
@@ -428,3 +501,204 @@ void verificarEstadoConexion()
         setBoardColor(255, 0, 0);
     }
 }
+/////////////////////////////////////
+
+/*
+    --------------------------------------
+        MODO mpc
+    --------------------------------------
+*/
+
+// MODO MPC ENVIO Y VALIDACIÓN MENSAJES MIDI
+static uint8_t mpeLimitar7(int valor)
+{
+    if (valor < 0)
+        return 0;
+    if (valor > 127)
+        return 127;
+    return (uint8_t)valor;
+}
+
+uint8_t mpeCanalMiembro(int canal) // Protege el canal maestro canal 1
+{
+    if (canal < MPE_CANAL_MIEMBRO_MIN)
+        return MPE_CANAL_MIEMBRO_MIN;
+    if (canal > MPE_CANAL_MIEMBRO_MAX)
+        return MPE_CANAL_MIEMBRO_MAX;
+    return (uint8_t)canal;
+}
+
+static uint8_t mpeCanalValido(int canal)
+{
+    if (canal < 1)
+        return 1;
+    if (canal > 16)
+        return 16;
+    return (uint8_t)canal;
+}
+// - ///////////- FIN MODO MPC VALIDACIÓN y ENVÍo MIDI - ////////////////////////////////////
+
+// -  NOTAS -
+// nota` y `velocidad` se limitan a 0..127.
+// En Note On, la velocidad nunca puede ser 0.
+// En Note Off se puede usar velocidad 0 (release velocity neutra).
+
+void mpeEnviarNotaOn(uint8_t nota, uint8_t velocidad, uint8_t canal)
+{
+    uint8_t c = mpeCanalMiembro(canal);
+    uint8_t n = mpeLimitar7(nota);
+    uint8_t v = mpeLimitar7(velocidad);
+
+    // Velocidad 0 equivaldría a Note Off: forzar mínimo 1
+    if (v == 0)
+        v = 1;
+
+    MIDI_OBJ.sendNoteOn(n, v, c);
+}
+
+void mpeEnviarNotaOff(uint8_t nota, uint8_t velocidad, uint8_t canal)
+{
+    uint8_t c = mpeCanalMiembro(canal);
+    uint8_t n = mpeLimitar7(nota);
+    uint8_t v = mpeLimitar7(velocidad);
+
+    MIDI_OBJ.sendNoteOff(n, v, c);
+}
+//- //////////- FIN NOTAS - //////////////////////////////////
+
+// PITCH BEND
+// Centro exacto = `0`.
+//`-1.0` = bend mínimo, `+1.0` = bend máximo.
+// Para el modo continuo del Bar, la posición normalizada se pasará a `mpeEnviarPitchBendNormalizado()`.
+void mpeEnviarPitchBend(int valor, uint8_t canal)
+{
+    uint8_t c = mpeCanalMiembro(canal);
+
+    if (valor < MPE_PITCHBEND_MIN)
+        valor = MPE_PITCHBEND_MIN;
+    if (valor > MPE_PITCHBEND_MAX)
+        valor = MPE_PITCHBEND_MAX;
+
+    MIDI_OBJ.sendPitchBend(valor, c);
+}
+
+void mpeEnviarPitchBendNormalizado(float valor, uint8_t canal)
+{
+    if (valor < -1.0f)
+        valor = -1.0f;
+    if (valor > 1.0f)
+        valor = 1.0f;
+
+    // Mismo criterio que la librería: 8192 hacia abajo, 8191 hacia arriba
+    int v;
+    if (valor < 0.0f)
+        v = (int)(valor * 8192.0f);
+    else
+        v = (int)(valor * 8191.0f);
+
+    mpeEnviarPitchBend(v, canal);
+}
+// - ////////- FIN PITCH BEND - ////////////////////////////
+
+// CHANNEL PRESURE Y CC74
+//`sendAfterTouch(presion, canal)` genera `0xD0`, que es el aftertouch correcto para MPE.
+// El timbre va exclusivamente por CC74 en canales miembro.
+void mpeEnviarPresionCanal(uint8_t presion, uint8_t canal)
+{
+    uint8_t c = mpeCanalMiembro(canal);
+    uint8_t p = mpeLimitar7(presion);
+
+    // Channel Pressure (0xD0), NO un CC de aftertouch
+    MIDI_OBJ.sendAfterTouch(p, c);
+}
+
+void mpeEnviarTimbre(uint8_t timbre, uint8_t canal)
+{
+    uint8_t c = mpeCanalMiembro(canal);
+    uint8_t t = mpeLimitar7(timbre);
+
+    MIDI_OBJ.sendControlChange(MPE_CC_TIMBRE, t, c);
+}
+// -////////////////- FIN CHANNEL PRESURE CC74 - /////////////////////////////////
+
+// MENSAJES RPN
+/*
+* No usar `beginRpn()` / `sendRpnValue()` de la librería: su caché 
+* `mCurrentRpnNumber` es **global al objeto MIDI**, 
+* no por canal, y puede omitir la selección del RPN 
+* al alternar entre canales 2–16. Los CC se envían 
+* directamente para que cada bloque sea determinista.
+*/
+void mpeEnviarRpnNulo(uint8_t canal)
+{
+    uint8_t c = mpeCanalValido(canal);
+    MIDI_OBJ.sendControlChange(101, 127, c); // RPN MSB = null
+    MIDI_OBJ.sendControlChange(100, 127, c); // RPN LSB = null
+}
+
+void mpeEnviarRpn(uint16_t numeroRpn, uint16_t valor14, uint8_t canal)
+{
+    uint8_t c = mpeCanalValido(canal);
+
+    uint8_t numMsb = (numeroRpn >> 7) & 0x7F;
+    uint8_t numLsb = numeroRpn & 0x7F;
+    uint8_t valMsb = (valor14 >> 7) & 0x7F;
+    uint8_t valLsb = valor14 & 0x7F;
+
+    MIDI_OBJ.sendControlChange(101, numMsb, c); // RPN MSB
+    MIDI_OBJ.sendControlChange(100, numLsb, c); // RPN LSB
+    MIDI_OBJ.sendControlChange(6,   valMsb, c); // Data Entry MSB
+    MIDI_OBJ.sendControlChange(38,  valLsb, c); // Data Entry LSB
+    mpeEnviarRpnNulo(c);
+
+    //Orden estándar: selección MSB → LSB, luego valor MSB → LSB, y finalmente RPN nulo.
+    //El RPN nulo evita que un Data Entry posterior cambie el parámetro por accidente.
+}
+// - /////////////- FIN MENSAJES RPN - ///////////////////////////
+
+// CONFIGURACIÓN DE LA ZONA MPE
+void mpeEnviarConfiguracionMpe(uint8_t canalesMiembro)
+{
+    if (canalesMiembro > 15) canalesMiembro = 15;
+
+    // RPN 6 (MPE Configuration) siempre en el canal maestro
+    mpeEnviarRpn(6, canalesMiembro, MPE_CANAL_MAESTRO);
+}
+
+void mpeEnviarRangoPitchBend(uint8_t canal, uint8_t semitonos, uint8_t cents)
+{
+    if (semitonos > 96) semitonos = 96;
+    if (cents > 127) cents = 127;
+
+    // RPN 0: semitonos en MSB, cents en LSB
+    uint16_t valor = ((uint16_t)semitonos << 7) | cents;
+    mpeEnviarRpn(0, valor, canal);
+}
+
+void mpeDesactivarZona(void)
+{
+    mpeEnviarRpn(6, 0, MPE_CANAL_MAESTRO);
+}
+
+void mpeConfigurarZona(uint8_t canalesMiembro,
+                       uint8_t rangoMaestroSemitonos,
+                       uint8_t rangoMiembroSemitonos)
+{
+    // 1. Activar la zona inferior con N miembros
+    mpeEnviarConfiguracionMpe(canalesMiembro);
+
+    // 2. Sensibilidad del canal maestro
+    mpeEnviarRangoPitchBend(MPE_CANAL_MAESTRO, rangoMaestroSemitonos, 0);
+
+    // 3. Sensibilidad de cada miembro (compatibilidad con sintes que la leen por canal)
+    for (uint8_t c = MPE_CANAL_MIEMBRO_MIN; c <= MPE_CANAL_MIEMBRO_MAX; c++)
+    {
+        mpeEnviarRangoPitchBend(c, rangoMiembroSemitonos, 0);
+    }
+}
+// - //////////- FIN ZONA MPE - ///////////////////////////////////
+
+// FAse2
+//uint8_t rangoBar = (uint8_t)(config.mpeRangoOctavas * 12);
+//mpeConfigurarZona(MPE_NUM_MIEMBROS, 2, rangoBar);
+

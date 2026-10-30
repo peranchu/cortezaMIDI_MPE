@@ -4,7 +4,8 @@
 #include <Arduino.h>
 
 // 1. ESTRUCTURA DE CONFIGURACIÓN DEL MENÚ (Sincronizada con ui_control)
-struct ConfigMenu {
+struct ConfigMenu
+{
     int canalMidi;
     int numeroCC_X;
     int numeroCC_Y;
@@ -18,13 +19,21 @@ struct ConfigMenu {
     int zonaMuerta;
     int trillBarMinPresion;
     int trillBarMaxPresion;
-    int modoMidi; // 0 = MIDI CC (actual), 1 = MIDI MPE
+    int modoMidi;        // 0 = MIDI CC (actual), 1 = MIDI MPE
+    int mpeBarModo;      // 0 = CONTINUO, 1 = CUANTIZADO
+    int mpeEscala;       // índice de escala (0..8)
+    int mpeNotaBase;     // 0..127
+    int mpeRangoOctavas; // 1..4
+    int mpeSquareModo;   // 0 = Y ESCALA, 1 = NOTA FIJA
+    int mpeSquareNota;   // 0..127
+    int mpeVersion;      // versión del bloque MPE (1)
 };
 
 extern ConfigMenu config;
 
 // 2. ESTRUCTURA DE CAPTURA DE DATOS FÍSICOS DEL SENSOR
-struct DatosSensor {
+struct DatosSensor
+{
     float accelX;
     float accelY;
     float accelZ;
@@ -63,4 +72,27 @@ void setBoardColor(uint8_t r, uint8_t g, uint8_t b);
 void guardarLimpiosEnEEPROM(void);
 void cargarLimpiosDesdeEEPROM(void);
 
+// 10. TRANSMISIÓN MIDI MPE (helpers)
+uint8_t mpeCanalMiembro(int canal);
+
+void mpeEnviarNotaOn(uint8_t nota, uint8_t velocidad, uint8_t canal);
+void mpeEnviarNotaOff(uint8_t nota, uint8_t velocidad, uint8_t canal);
+
+void mpeEnviarPitchBend(int valor, uint8_t canal);              // firmado -8192..+8191
+void mpeEnviarPitchBendNormalizado(float valor, uint8_t canal); // -1.0..+1.0
+
+void mpeEnviarPresionCanal(uint8_t presion, uint8_t canal);     // Channel Pressure 0xD0
+void mpeEnviarTimbre(uint8_t timbre, uint8_t canal);            // CC74
+
+void mpeEnviarRpn(uint16_t numeroRpn, uint16_t valor14, uint8_t canal);
+void mpeEnviarRpnNulo(uint8_t canal);
+
+void mpeEnviarConfiguracionMpe(uint8_t canalesMiembro);         // RPN 6 en canal 1
+void mpeEnviarRangoPitchBend(uint8_t canal, uint8_t semitonos, uint8_t cents); // RPN 0
+void mpeDesactivarZona(void);                                   // RPN 6 = 0
+void mpeConfigurarZona(uint8_t canalesMiembro,
+                       uint8_t rangoMaestroSemitonos,
+                       uint8_t rangoMiembroSemitonos);
+
+                       
 #endif // SENSOR_MIDI_ACELL_H
