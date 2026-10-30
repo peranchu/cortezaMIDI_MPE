@@ -18,6 +18,7 @@ enum PantallaActual {
   PANTALLA_ZONA_MUERTA,
   PANTALLA_CALIBRANDO,          // Estado para la pantalla de calibración dinámica
   PANTALLA_CALIBRADO_TRILL_BAR, // Pantalla calibración trillbar
+  PANTALLA_MODO_MIDI,           // Selector entre MIDI CC y MPE
   TOTAL_PANTALLAS 
 };
 

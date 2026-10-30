@@ -63,6 +63,7 @@ ConfigMenu config = {
     .zonaMuerta = 5,
     .trillBarMinPresion = 450,
     .trillBarMaxPresion = 6500,
+    .modoMidi = 0, // Por seguridad, arrancar siempre en el modo CC actual
 };
 
 bool calibracionEnProgreso = false;
@@ -107,6 +108,7 @@ void guardarLimpiosEnEEPROM()
     EEPROM.put(ADDR_MENU + 40, config.trillSquareCC_X);
     EEPROM.put(ADDR_MENU + 44, config.trillSquareCC_Y);
     EEPROM.put(ADDR_MENU + 48, config.trillSquareCC_Z);
+    EEPROM.put(ADDR_MENU + 52, config.modoMidi); // Dirección 88: selector CC/MPE
 
     EEPROM.commit();
     interrupts();
@@ -138,6 +140,7 @@ void cargarLimpiosDesdeEEPROM()
         EEPROM.get(ADDR_MENU + 40, config.trillSquareCC_X);
         EEPROM.get(ADDR_MENU + 44, config.trillSquareCC_Y);
         EEPROM.get(ADDR_MENU + 48, config.trillSquareCC_Z);
+        EEPROM.get(ADDR_MENU + 52, config.modoMidi);
 
         // ... (Aquí se quedan todas tus lecturas EEPROM.get normales de la calibración y el menú) ...
 
@@ -171,7 +174,12 @@ void cargarLimpiosDesdeEEPROM()
         if (config.trillBarMaxPresion <= 0)
             config.trillBarMaxPresion = 6500;
 
-        // 5. Controladores MIDI del Pad Trill Square
+        // 5. Modo MIDI: solo se aceptan CC (0) o MPE (1).
+        // Valores antiguos/no inicializados vuelven al modo CC seguro.
+        if (config.modoMidi != 0 && config.modoMidi != 1)
+            config.modoMidi = 0;
+
+        // 6. Controladores MIDI del Pad Trill Square
         if (config.trillSquareCC_X < 0 || config.trillSquareCC_X > 127)
             config.trillSquareCC_X = 22;
         if (config.trillSquareCC_Y < 0 || config.trillSquareCC_Y > 127)
