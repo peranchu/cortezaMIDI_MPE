@@ -512,7 +512,7 @@ void verificarUI()
         break;
       }
 
-        // PANTALLA CANAL
+        // PANTALLA MODO
       case PANTALLA_MODO_MIDI:
       {
         // Diseño reorganizado para que el valor seleccionado no se solape
@@ -537,7 +537,7 @@ void verificarUI()
         }
         break;
       }
-
+      // PANTALLA CANAL
       case PANTALLA_CANAL:
         u8g2.setFont(u8g2_font_7x14_tf);
         u8g2.drawStr(10, 22, "CANAL MIDI");
