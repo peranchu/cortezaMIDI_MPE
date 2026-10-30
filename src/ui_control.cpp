@@ -191,6 +191,12 @@ void verificarUI()
     {
       switch (pantallaActiva)
       {
+      case PANTALLA_MODO_MIDI:
+        // Cada paso del encoder alterna entre CC (0) y MPE (1).
+        if ((abs(diferencia) % 2) == 1)
+          config.modoMidi = (config.modoMidi == 0) ? 1 : 0;
+        break;
+
       case PANTALLA_CANAL:
         config.canalMidi += diferencia;
         if (config.canalMidi > 16)
@@ -507,6 +513,31 @@ void verificarUI()
       }
 
         // PANTALLA CANAL
+      case PANTALLA_MODO_MIDI:
+      {
+        // Diseño reorganizado para que el valor seleccionado no se solape
+        // con las descripciones de los modos en la pantalla OLED de 128x64.
+        u8g2.setFont(u8g2_font_7x14_tf);
+        u8g2.drawStr(6, 15, "MODO MIDI");
+        u8g2.drawHLine(6, 19, 116);
+
+        u8g2.setFont(u8g2_font_6x10_tf);
+        u8g2.drawStr(6, 31, "CC: Mensj Conti");
+        u8g2.drawStr(6, 42, "MPE: Mode Poly");
+
+        // Zona inferior reservada para mostrar el modo seleccionado.
+        u8g2.drawFrame(6, 48, 116, 15);
+        u8g2.setFont(u8g2_font_6x10_tf);
+        u8g2.drawStr(12, 59, "SELECCION:");
+
+        if (!modoEdicionActivo || estadoParpadeo)
+        {
+          u8g2.setFont(u8g2_font_7x14_tf);
+          u8g2.drawStr(86, 60, (config.modoMidi == 1) ? "MPE" : "CC");
+        }
+        break;
+      }
+
       case PANTALLA_CANAL:
         u8g2.setFont(u8g2_font_7x14_tf);
         u8g2.drawStr(10, 22, "CANAL MIDI");

@@ -18,6 +18,7 @@ struct ConfigMenu {
     int zonaMuerta;
     int trillBarMinPresion;
     int trillBarMaxPresion;
+    int modoMidi; // 0 = MIDI CC (actual), 1 = MIDI MPE
 };
 
 extern ConfigMenu config;
