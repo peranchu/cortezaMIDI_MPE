@@ -1,3 +1,12 @@
+/**
+ * @brief Procesa las lecturas del Trill Bar aplicando la física MPE (Continuo o Cuantizado).
+ *        Esta función aísla las matemáticas MPE del modo CC tradicional.
+ * 
+ * @param posCruda  Posición X leída del sensor (0..3200)
+ * @param presCruda Presión Z leída del sensor (touchSize)
+ * @param numToques Cantidad de dedos detectados en el sensor
+ */
+
 #ifndef MIDI_MPE_CONTROL_H
 #define MIDI_MPE_CONTROL_H
 
@@ -67,14 +76,12 @@ inline const uint8_t intervalosRaga[]        = {0, 1, 4, 5, 7, 8, 11}; // 7 nota
 // INTERFAZ PÚBLICA DEL MOTOR MPE (MÓDULO INDEPENDIENTE)
 // ================================================================
 
-/**
- * @brief Procesa las lecturas del Trill Bar aplicando la física MPE (Continuo o Cuantizado).
- *        Esta función aísla las matemáticas MPE del modo CC tradicional.
- * 
- * @param posCruda  Posición X leída del sensor (0..3200)
- * @param presCruda Presión Z leída del sensor (touchSize)
- * @param numToques Cantidad de dedos detectados en el sensor
- */
+// comportamiento de la barra MPE
+enum ModoBarraMPE {
+    MPE_BAR_CONTINUO = 0, // El Ribbon clásico que ya tienes
+    MPE_BAR_CUANTIZADO_KEYS = 1,    // El modo por teclas (Keys) que ya funciona
+};
+
 void procesarBarMPE(int posCruda, int presCruda, int numToques);
 
 /**

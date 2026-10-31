@@ -297,10 +297,10 @@ void verificarUI()
         // Lógica de edición para tus parámetros MPE (ej: alternar continuo/cuantizado)
         // Alterna entre 0 (Continuo) y 1 (Cuantizado)
         config.mpeBarModo += diferencia;
-        if (config.mpeBarModo > 1)
+        if (config.mpeBarModo > 2)
           config.mpeBarModo = 0;
         if (config.mpeBarModo < 0)
-          config.mpeBarModo = 1;
+          config.mpeBarModo = 2;
         break;
 
       case PANTALLA_MPE_BAR_OCTAVAS:
@@ -771,14 +771,10 @@ void verificarUI()
         u8g2.drawHLine(10, 26, 110);
 
         u8g2.setFont(u8g2_font_6x12_tr);
-        if (config.mpeBarModo == 0)
-        {
-          u8g2.drawStr(10, 48, "> Ribbon (Continuo)");
-        }
-        else
-        {
-          u8g2.drawStr(10, 48, "> Keys (Cuantizado)");
-        }
+
+        if (config.mpeBarModo == 0)      u8g2.drawStr(15, 48, "> Ribbon Crom.");
+        else if (config.mpeBarModo == 1) u8g2.drawStr(15, 48, "> Keys (Cuant.)");
+        else if (config.mpeBarModo == 2) u8g2.drawStr(15, 48, "> Ribbon Escala"); // 🚀 Nueva opción
         break;
 
       case PANTALLA_MPE_BAR_OCTAVAS:
