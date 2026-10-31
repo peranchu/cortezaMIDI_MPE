@@ -56,21 +56,21 @@ inline const char* nombresEscalas[] = {
 };
 
 // Tablas de intervalos musicales (semitonos desde la nota raíz Do)
-inline const uint8_t intervalosMayor[]       = {0, 2, 4, 5, 7, 9, 11}; // 7 notas
-inline const uint8_t intervalosMenorNat[]    = {0, 2, 3, 5, 7, 8, 10}; // 7 notas
-inline const uint8_t intervalosDorica[]      = {0, 2, 3, 5, 7, 9, 10}; // 7 notas
-inline const uint8_t intervalosFrigia[]      = {0, 1, 3, 5, 7, 8, 10}; // 7 notas
-inline const uint8_t intervalosMixolidia[]   = {0, 2, 4, 5, 7, 9, 10}; // 7 notas
-inline const uint8_t intervalosMenorArm[]    = {0, 2, 3, 5, 7, 8, 11}; // 7 notas
-inline const uint8_t intervalosPentatonica[] = {0, 2, 4, 7, 9};         // 5 notas
-inline const uint8_t intervalosPentaMenor[]  = {0, 3, 5, 7, 10};       // 5 notas
+static const uint8_t intervalosMayor[]       = {0, 2, 4, 5, 7, 9, 11}; // 7 notas
+static const uint8_t intervalosMenorNat[]    = {0, 2, 3, 5, 7, 8, 10}; // 7 notas
+static const uint8_t intervalosDorica[]      = {0, 2, 3, 5, 7, 9, 10}; // 7 notas
+static const uint8_t intervalosFrigia[]      = {0, 1, 3, 5, 7, 8, 10}; // 7 notas
+static const uint8_t intervalosMixolidia[]   = {0, 2, 4, 5, 7, 9, 10}; // 7 notas
+static const uint8_t intervalosMenorArm[]    = {0, 2, 3, 5, 7, 8, 11}; // 7 notas
+static const uint8_t intervalosPentatonica[] = {0, 2, 4, 7, 9};         // 5 notas
+static const uint8_t intervalosPentaMenor[]  = {0, 3, 5, 7, 10};       // 5 notas
 // Intervalos nuevos:
-inline const uint8_t intervalosCeltic[]      = {0, 2, 3, 5, 7, 8, 10}; // 7 notas (Afinación Rey del Hang)
-inline const uint8_t intervalosHijaz[]       = {0, 1, 4, 5, 7, 8, 10}; // 7 notas (Intervalo gigante entre 2ª y 3ª)
-inline const uint8_t intervalosAkebono[]     = {0, 2, 3, 7, 8};         // 5 notas (Estructura flotante japonesa)
-inline const uint8_t intervalosInsen[]       = {0, 1, 5, 7, 10};        // 5 notas (Afinación tradicional de Koto)
-inline const uint8_t intervalosBlues[]       = {0, 3, 5, 6, 7, 10};     // 6 notas (¡Ojo, esta tiene 6 notas!)
-inline const uint8_t intervalosRaga[]        = {0, 1, 4, 5, 7, 8, 11}; // 7 notas (Modo Bhairav)
+static const uint8_t intervalosCeltic[]      = {0, 2, 3, 5, 7, 8, 10}; // 7 notas (Afinación Rey del Hang)
+static const uint8_t intervalosHijaz[]       = {0, 1, 4, 5, 7, 8, 10}; // 7 notas (Intervalo gigante entre 2ª y 3ª)
+static const uint8_t intervalosAkebono[]     = {0, 2, 3, 7, 8};         // 5 notas (Estructura flotante japonesa)
+static const uint8_t intervalosInsen[]       = {0, 1, 5, 7, 10};        // 5 notas (Afinación tradicional de Koto)
+static const uint8_t intervalosBlues[]       = {0, 3, 5, 6, 7, 10};     // 6 notas (¡Ojo, esta tiene 6 notas!)
+static const uint8_t intervalosRaga[]        = {0, 1, 4, 5, 7, 8, 11}; // 7 notas (Modo Bhairav)
 
 // ================================================================
 // INTERFAZ PÚBLICA DEL MOTOR MPE (MÓDULO INDEPENDIENTE)

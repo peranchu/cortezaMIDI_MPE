@@ -137,80 +137,35 @@ void procesarBarMPE(int posCruda, int presCruda, int numToques)
 
     if (numToques > 0)
     {
-        // ================================================================
-        // 1. FILTRADO Y MAPEO DE PRESIÓN (Tu lógica original intacta)
-        // ================================================================
+        // 1. Filtrado y mapeo de presión (Tu lógica original intacta)
         barPresionFiltradaMPE = (ALFA_BAR_PRES_MPE * presCruda) + ((1.0f - ALFA_BAR_PRES_MPE) * barPresionFiltradaMPE);
         int targetMidiPres = map(constrain((int)barPresionFiltradaMPE, minFader, maxFader), minFader, maxFader, 0, 127);
         uint8_t presionMIDI = (uint8_t)constrain(targetMidiPres, 0, 127);
 
         // ================================================================
-        // 2. MODO 0: RIBBON CONTINUO INTELIGENTE POR ESCALAS
+        // 2. MODO 0: RIBBON CROMÁTICO TRADICIONAL (Tu motor original perfecto)
         // ================================================================
         if (config.mpeBarModo == 0)
         {
-              // Posición del dedo de 0.0 (izq) a 1.0 (der) - Tu línea original literal
+            // Calculamos cuántos semitonos reales caben en la barra según tu menú de octavas
+            float totalSemitonosMenu = config.mpeRangoOctavas * 12.0f;
+
+            // Posición del dedo de 0.0 (izq) a 1.0 (der)
             float factorPosicion = constrain((float)posCruda / 3200.0f, 0.0f, 1.0f);
 
-            uint8_t notaMidiFinal = 0;
-            float fraccionSemitono = 0.0f;
+            // Nota flotante exacta: Nota Base + los semitonos que te desplaces
+            float notaFlotanteReal = config.mpeNotaBase + (factorPosicion * totalSemitonosMenu) + config.transposicion;
 
-            // Definimos la escala cromática como una matriz real para unificar la matemática
-            static const uint8_t intervalosCromatica[] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11};
+            // La nota MIDI física que enviamos en el Note On es la parte entera
+            uint8_t notaMidiFinal = (uint8_t)constrain((int)notaFlotanteReal, 0, 127);
 
-            int sizeofEscala = 7;
-            const uint8_t* intervalos = intervalosMayor;
+            // La fracción sobrante (los decimales) es la desafinación fina entre tecla y tecla
+            float fraccionSemitono = notaFlotanteReal - (int)notaFlotanteReal;
 
-            // 🧠 El switch ahora gobierna el 100% de los modos de forma directa y sin filtros externos
-            switch (config.mpeEscala) 
-            {
-                case ESCALA_CROMATICA:   sizeofEscala = 12; intervalos = intervalosCromatica;  break;
-                case ESCALA_MENOR_NAT:   sizeofEscala = 7; intervalos = intervalosMenorNat;    break;
-                case ESCALA_DORICA:      sizeofEscala = 7; intervalos = intervalosDorica;      break;
-                case ESCALA_FRIGIA:      sizeofEscala = 7; intervalos = intervalosFrigia;      break;
-                case ESCALA_MIXOLIDIA:   sizeofEscala = 7; intervalos = intervalosMixolidia;   break;
-                case ESCALA_MENOR_ARM:   sizeofEscala = 7; intervalos = intervalosMenorArm;    break;
-                case ESCALA_PENTATONICA: sizeofEscala = 5; intervalos = intervalosPentatonica; break;
-                case ESCALA_PENTA_MENOR: sizeofEscala = 5; intervalos = intervalosPentaMenor;  break;
-                case ESCALA_CELTIC_AMARA:sizeofEscala = 7; intervalos = intervalosCeltic;       break;
-                case ESCALA_HIJAZ:       sizeofEscala = 7; intervalos = intervalosHijaz;        break;
-                case ESCALA_AKEBONO:     sizeofEscala = 5; intervalos = intervalosAkebono;      break;
-                case ESCALA_INSEN:       sizeofEscala = 5; intervalos = intervalosInsen;        break;
-                case ESCALA_PENTATONICA_BLUES: sizeofEscala = 6; intervalos = intervalosBlues;  break;
-                case ESCALA_RAGA_BHAIRAV:sizeofEscala = 7; intervalos = intervalosRaga;         break;
-                default:                 sizeofEscala = 7; intervalos = intervalosMayor;        break;
-            }
-
-            // Calculamos el tamaño virtual total del fader medido en "teclas de escala"
-            float totalTeclasEscala = (float)config.mpeRangoOctavas * (float)sizeofEscala;
-            float posicionTeclaFlotante = factorPosicion * (totalTeclasEscala - 1.0f);
-            
-            int indiceTeclaBase = (int)posicionTeclaFlotante;
-            float fraccionEntreTeclas = posicionTeclaFlotante - (float)indiceTeclaBase;
-
-            // Nota entera izquierda de la escala en este tramo físico
-            int octavaBase = indiceTeclaBase / sizeofEscala;
-            int notaEnEscala = indiceTeclaBase % sizeofEscala;
-            float notaMidiBase = (float)config.mpeNotaBase + (float)(octavaBase * 12) + (float)intervalos[notaEnEscala] + (float)config.transposicion;
-
-            // Nota entera derecha (siguiente peldaño de la escala) para calcular el ancho del salto
-            int indiceTeclaSig = indiceTeclaBase + 1;
-            if (indiceTeclaSig >= (int)totalTeclasEscala) indiceTeclaSig = (int)totalTeclasEscala - 1;
-            
-            int octavaSig = indiceTeclaSig / sizeofEscala;
-            int notaEnEscalaSig = indiceTeclaSig % sizeofEscala;
-            float notaMidiSig = (float)config.mpeNotaBase + (float)(octavaSig * 12) + (float)intervalos[notaEnEscalaSig] + (float)config.transposicion;
-
-            // 🎯 ASIGNACIÓN ESTRICTA: El Note On se emite fijado en el escalón izquierdo real
-            notaMidiFinal = (uint8_t)constrain((int)notaMidiBase, 0, 127);
-            
-            // Y multiplicamos la fracción decimal por el salto elástico en semitonos (ej. 3 semitonos enteros)
-            fraccionSemitono = fraccionEntreTeclas * (notaMidiSig - notaMidiBase);
-
-            // Dividimos por los 48 semitonos de tu motor MPE original intacto
+            // En MPE estándar con tu motor original, dividimos por 48.0f
             float desvioPitchBendMPE = fraccionSemitono / 48.0f;
 
-            // GESTIÓN DEL ATAQUE O CAMBIO DE NOTA EN CONTINUO (Tu motor original literal)
+            // GESTIÓN DEL ATAQUE O CAMBIO DE NOTA EN CONTINUO (LEGATO)
             if (!barDedoPuestoMPE)
             {
                 barDedoPuestoMPE = true;
@@ -219,17 +174,16 @@ void procesarBarMPE(int posCruda, int presCruda, int numToques)
             }
             else if (notaMidiFinal != barNotaActualMPE)
             {
-                // Solo cambia de nota cuando el dedo cruza a un nuevo intervalo real de la escala activa
                 mpeEnviarNotaOff(barNotaActualMPE, 0, 2);
                 barNotaActualMPE = notaMidiFinal;
                 mpeEnviarNotaOn(barNotaActualMPE, 100, 2);
             }
 
-            // Enviamos la micro-afinación elástica resultante
+            // Enviamos el micro-tono continuo calculado
             mpeEnviarPitchBendNormalizado(desvioPitchBendMPE, 2);
         }
         // ================================================================
-        // 3. MODO 1: KEYS (CUANTIZADO) (Tu lógica original intacta)
+        // 3. MODO 1: KEYS (CUANTIZADO POR ESCALAS) (Tu lógica original intacta)
         // ================================================================
         else
         {
@@ -258,9 +212,6 @@ void procesarBarMPE(int posCruda, int presCruda, int numToques)
     }
     else
     {
-        // ================================================================
-        // RELEVOS AL LEVANTAR EL DEDO (Tu lógica original intacta)
-        // ================================================================
         if (barDedoPuestoMPE)
         {
             barDedoPuestoMPE = false;
