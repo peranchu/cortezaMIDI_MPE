@@ -301,6 +301,11 @@ void verificarUI()
           config.mpeBarModo = 0;
         if (config.mpeBarModo < 0)
           config.mpeBarModo = 1;
+        
+        // 💾 ¡AGREGADO! Guarda automáticamente en la EEPROM al cambiar el modo
+        extern void guardarLimpiosEnEEPROM(); 
+        guardarLimpiosEnEEPROM();
+
         break;
 
       case PANTALLA_MPE_BAR_OCTAVAS:

@@ -681,7 +681,7 @@ void cargarLimpiosDesdeEEPROM()
             config.mpeBarModo = 0;
 
         // 9 escalas: 0..8
-        if (config.mpeEscala < 0 || config.mpeEscala > 8)
+        if (config.mpeEscala < 0 || config.mpeEscala > 13)
             config.mpeEscala = 0;
 
         if (config.mpeNotaBase < 0 || config.mpeNotaBase > 127)
