@@ -326,8 +326,16 @@ void verificarUI()
       case PANTALLA_MPE_BAR_ESCALA:
         // Avanza o retrocede de forma cíclica entre todas las escalas de la cabecera
         config.mpeEscala += diferencia;
-        if (config.mpeEscala >= TOTAL_ESCALAS) config.mpeEscala = 0;
-        if (config.mpeEscala < 0)              config.mpeEscala = TOTAL_ESCALAS - 1;
+        if (config.mpeEscala >= TOTAL_ESCALAS)
+          config.mpeEscala = 0;
+        if (config.mpeEscala < 0)
+          config.mpeEscala = TOTAL_ESCALAS - 1;
+        break;
+
+      case PANTALLA_MPE_BAR_TRANSPOSICION:
+        config.transposicion += diferencia;
+        if (config.transposicion > 12)  config.transposicion = -12; // Da la vuelta al mínimo
+        if (config.transposicion < -12) config.transposicion = 12;  // Da la vuelta al máximo
         break;  
 
       default:
@@ -815,6 +823,28 @@ void verificarUI()
         snprintf(textoEscala, sizeof(textoEscala), "> %s", nombresEscalas[config.mpeEscala]);
         u8g2.drawStr(15, 48, textoEscala);
         break;
+
+      case PANTALLA_MPE_BAR_TRANSPOSICION:
+      u8g2.setFont(u8g2_font_7x14_tf);
+      u8g2.drawStr(10, 22, "MPE TRANSPOSE");
+      u8g2.drawHLine(10, 26, 110);
+
+      u8g2.setFont(u8g2_font_6x12_tr);
+      char bufferTrans[32]; // Aseguramos la declaración del buffer local
+      if (config.transposicion == 0)
+      {
+        snprintf(bufferTrans, sizeof(bufferTrans), "> Centro (0 semit)");
+      }
+      else if (config.transposicion > 0)
+      {
+        snprintf(bufferTrans, sizeof(bufferTrans), "> Subir (+%d semit)", config.transposicion);
+      }
+      else
+      {
+        snprintf(bufferTrans, sizeof(bufferTrans), "> Bajar (%d semit)", config.transposicion);
+      }
+      u8g2.drawStr(15, 48, bufferTrans);
+      break;  
       }
 
     } while (u8g2.nextPage());

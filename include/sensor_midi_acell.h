@@ -27,6 +27,7 @@ struct ConfigMenu
     int mpeSquareModo;   // 0 = Y ESCALA, 1 = NOTA FIJA
     int mpeSquareNota;   // 0..127
     int mpeVersion;      // versión del bloque MPE (1)
+    int transposicion;   
 };
 
 extern ConfigMenu config;

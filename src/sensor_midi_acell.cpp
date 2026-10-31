@@ -87,6 +87,7 @@ ConfigMenu config = {
     .mpeSquareModo = 0,   // Y selecciona la nota
     .mpeSquareNota = 48,  // C3 si se usa nota fija
     .mpeVersion = 1,
+    .transposicion = 0, // 👈 NUEVA: Desfase en semitonos (por defecto 0)
 };
 
 bool calibracionEnProgreso = false;

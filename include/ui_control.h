@@ -18,7 +18,8 @@ enum PantallaActual {
   PANTALLA_MPE_BAR_ESCALA,      
   PANTALLA_MPE_BAR_OCTAVAS,     
   PANTALLA_MPE_BAR_NOTA,        
-
+  PANTALLA_MPE_BAR_TRANSPOSICION,
+  
   // 🔸 BLOQUE 3: PANTALLAS EXCLUSIVAS CC (Solo visibles si modoMidi == 0)
   PANTALLA_CC_X,         
   PANTALLA_CC_Y,         
