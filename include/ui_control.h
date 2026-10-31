@@ -14,7 +14,8 @@ enum PantallaActual {
   PANTALLA_MODO_MIDI,           // Selector entre MIDI CC y MPE (La frontera)
 
   // 🔹 BLOQUE 2: PANTALLAS EXCLUSIVAS MPE (Solo visibles si modoMidi == 1)
-  PANTALLA_MPE_BAR_MODO,        
+  PANTALLA_MPE_BAR_MODO,  
+  PANTALLA_MPE_BAR_ESCALA,      
   PANTALLA_MPE_BAR_OCTAVAS,     
   PANTALLA_MPE_BAR_NOTA,        
 

@@ -22,16 +22,105 @@ static const float ALFA_BAR_PRES_MPE = 0.15;
 // ================================================================
 static uint8_t calcularNotaMpeCuantizada(int posCruda)
 {
-    float totalSemitonos = config.mpeRangoOctavas * 12.0f; // Ej: 2 octavas = 24 semitonos
-    float factorPos = constrain((float)posCruda / 3200.0f, 0.0f, 1.0f);
-    int notaCalculada = config.mpeNotaBase + (int)(factorPos * totalSemitonos);
+    // Mantenemos tus márgenes de confort de 100 píxeles para que sea ergonómico
+    int posAjustada = constrain(posCruda, 100, 3100);
+    float factorPos = (float)(posAjustada - 100) / 3000.0f;
 
-    if (notaCalculada < 0)
-        return 0;
-    if (notaCalculada > 127)
-        return 127;
-    return (uint8_t)notaCalculada;
+    // 1. MODO CROMÁTICO (Igual que antes pero protegido)
+    if (config.mpeEscala == ESCALA_CROMATICA)
+    {
+        float totalSemitonos = config.mpeRangoOctavas * 12.0f;
+        int notaCalculada = config.mpeNotaBase + (int)(factorPos * totalSemitonos);
+        return (uint8_t)constrain(notaCalculada, 0, 127);
+    }
+
+    // --- LÓGICA DE ESCALAS DIATÓNICAS/PENTATÓNICAS ---
+    int sizeofEscala = 7;
+    const uint8_t *intervalos = intervalosMayor;
+    
+    switch (config.mpeEscala)
+    {
+    case ESCALA_MENOR_NAT:
+        sizeofEscala = 7;
+        intervalos = intervalosMenorNat;
+        break;
+    case ESCALA_DORICA:
+        sizeofEscala = 7;
+        intervalos = intervalosDorica;
+        break;
+    case ESCALA_FRIGIA:
+        sizeofEscala = 7;
+        intervalos = intervalosFrigia;
+        break;
+    case ESCALA_MIXOLIDIA:
+        sizeofEscala = 7;
+        intervalos = intervalosMixolidia;
+        break;
+    case ESCALA_MENOR_ARM:
+        sizeofEscala = 7;
+        intervalos = intervalosMenorArm;
+        break;
+    case ESCALA_PENTATONICA:
+        sizeofEscala = 5;
+        intervalos = intervalosPentatonica;
+        break;
+    case ESCALA_PENTA_MENOR:
+        sizeofEscala = 5;
+        intervalos = intervalosPentaMenor;
+        break;
+
+    // Asignación de las nuevas escalas exóticas
+    case ESCALA_CELTIC_AMARA:
+        sizeofEscala = 7;
+        intervalos = intervalosCeltic;
+        break;
+    case ESCALA_HIJAZ:
+        sizeofEscala = 7;
+        intervalos = intervalosHijaz;
+        break;
+    case ESCALA_AKEBONO:
+        sizeofEscala = 5;
+        intervalos = intervalosAkebono;
+        break;
+    case ESCALA_INSEN:
+        sizeofEscala = 5;
+        intervalos = intervalosInsen;
+        break;
+    case ESCALA_PENTATONICA_BLUES:
+        sizeofEscala = 6;
+        intervalos = intervalosBlues;
+        break; // 6 Notas
+    case ESCALA_RAGA_BHAIRAV:
+        sizeofEscala = 7;
+        intervalos = intervalosRaga;
+        break;
+
+    default:
+        sizeofEscala = 7;
+        intervalos = intervalosMayor;
+        break;
+    }
+
+    int totalTeclasEnBarra = config.mpeRangoOctavas * sizeofEscala;
+
+    // 💡 REPARTO SIMÉTRICO: Multiplicamos por los índices máximos posibles (totalTeclas - 1)
+    // para que la última nota tenga exactamente el mismo ancho en píxeles que las demás.
+    int teclaActual = (int)(factorPos * (totalTeclasEnBarra - 1));
+
+    // Control defensivo por si acaso
+    if (teclaActual < 0)
+        teclaActual = 0;
+    if (teclaActual >= totalTeclasEnBarra)
+        teclaActual = totalTeclasEnBarra - 1;
+
+    int octavaDeLaTecla = teclaActual / sizeofEscala;
+    int indiceIntervalo = teclaActual % sizeofEscala;
+
+    int notaCalculada = config.mpeNotaBase + (octavaDeLaTecla * 12) + intervalos[indiceIntervalo];
+
+    return (uint8_t)constrain(notaCalculada, 0, 127);
 }
+/////////////////////////////////////////////////////
 
 // ================================================================
 // LÓGICA DE PROCESAMIENTO MPE COMPLETA PARA EL TRILL BAR
@@ -58,16 +147,16 @@ void procesarBarMPE(int posCruda, int presCruda, int numToques)
         {
             // Calculamos cuántos semitonos reales caben en la barra según tu menú de octavas
             float totalSemitonosMenu = config.mpeRangoOctavas * 12.0f;
-            
+
             // Posición del dedo de 0.0 (izq) a 1.0 (der)
             float factorPosicion = constrain((float)posCruda / 3200.0f, 0.0f, 1.0f);
-            
+
             // Nota flotante exacta: Nota Base + los semitonos que te desplaces
             float notaFlotanteReal = config.mpeNotaBase + (factorPosicion * totalSemitonosMenu);
-            
+
             // La nota MIDI física que enviamos en el Note On es la parte entera
             uint8_t notaMidiFinal = (uint8_t)constrain((int)notaFlotanteReal, 0, 127);
-            
+
             // La fracción sobrante (los decimales) es la desafinación fina entre tecla y tecla
             float fraccionSemitono = notaFlotanteReal - (int)notaFlotanteReal;
 
@@ -84,7 +173,7 @@ void procesarBarMPE(int posCruda, int presCruda, int numToques)
             }
             else if (notaMidiFinal != barNotaActualMPE)
             {
-                // Si el deslizamiento cruza la frontera de un semitono entero, 
+                // Si el deslizamiento cruza la frontera de un semitono entero,
                 // hacemos un ligado limpio (legato) para actualizar la nota base en el sinte
                 mpeEnviarNotaOff(barNotaActualMPE, 0, 2);
                 barNotaActualMPE = notaMidiFinal;
@@ -129,15 +218,16 @@ void procesarBarMPE(int posCruda, int presCruda, int numToques)
 
             if (config.mpeBarModo == 0)
             {
-                mpeEnviarPitchBendNormalizado(0.0f, 2); 
+                mpeEnviarPitchBendNormalizado(0.0f, 2);
             }
             barNotaActualMPE = 0;
 
             extern void setBoardColor(uint8_t r, uint8_t g, uint8_t b);
-            setBoardColor(0, 0, 0); 
+            setBoardColor(0, 0, 0);
         }
     }
 }
+//////////////////////////////////////////////////
 
 // ================================================================
 // WATCHDOG DE SEGURIDAD (Evita notas colgadas al cambiar de menús)
@@ -157,6 +247,7 @@ void mpeLimpiarVozBar(void)
         barUltimoXCrudoConNota = -1;
     }
 }
+////////////////////////////////////////////////
 
 // ================================================================
 // CONFIGURACIÓN AUTOMÁTICA DE LA ZONA MPE AL CAMBIAR DE MODO

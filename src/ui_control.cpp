@@ -3,6 +3,7 @@
 #include "trill_square_control.h"
 #include "sensor_midi_acell.h"
 #include "encoder_control.h"
+#include "midi_mpe_control.h"
 #include "bitmap.h"
 #include <U8g2lib.h>
 
@@ -296,25 +297,38 @@ void verificarUI()
         // Lógica de edición para tus parámetros MPE (ej: alternar continuo/cuantizado)
         // Alterna entre 0 (Continuo) y 1 (Cuantizado)
         config.mpeBarModo += diferencia;
-        if (config.mpeBarModo > 1)  config.mpeBarModo = 0;
-        if (config.mpeBarModo < 0)  config.mpeBarModo = 1;
+        if (config.mpeBarModo > 1)
+          config.mpeBarModo = 0;
+        if (config.mpeBarModo < 0)
+          config.mpeBarModo = 1;
         break;
 
       case PANTALLA_MPE_BAR_OCTAVAS:
         // Lógica de edición para rango de octavas MPE
         // Rango típico de octavas para la longitud de la barra (de 1 a 8 octavas)
         config.mpeRangoOctavas += diferencia;
-        if (config.mpeRangoOctavas > 8) config.mpeRangoOctavas = 1;
-        if (config.mpeRangoOctavas < 1) config.mpeRangoOctavas = 8;
+        if (config.mpeRangoOctavas > 8)
+          config.mpeRangoOctavas = 1;
+        if (config.mpeRangoOctavas < 1)
+          config.mpeRangoOctavas = 8;
         break;
 
       case PANTALLA_MPE_BAR_NOTA:
         // Lógica de edición para nota base MPE
         // Nota base MIDI (0 = C-1, 127 = G9). Avanza de 1 en 1 pinchando notas reales
         config.mpeNotaBase += diferencia;
-        if (config.mpeNotaBase > 127) config.mpeNotaBase = 1;
-        if (config.mpeNotaBase < 0)   config.mpeNotaBase = 127;
+        if (config.mpeNotaBase > 127)
+          config.mpeNotaBase = 1;
+        if (config.mpeNotaBase < 0)
+          config.mpeNotaBase = 127;
         break;
+
+      case PANTALLA_MPE_BAR_ESCALA:
+        // Avanza o retrocede de forma cíclica entre todas las escalas de la cabecera
+        config.mpeEscala += diferencia;
+        if (config.mpeEscala >= TOTAL_ESCALAS) config.mpeEscala = 0;
+        if (config.mpeEscala < 0)              config.mpeEscala = TOTAL_ESCALAS - 1;
+        break;  
 
       default:
         break;
@@ -788,6 +802,19 @@ void verificarUI()
         u8g2.drawStr(15, 48, textoNota);
       }
       break;
+
+      case PANTALLA_MPE_BAR_ESCALA:
+        u8g2.setFont(u8g2_font_7x14_tf);
+        u8g2.drawStr(10, 22, "MPE BAR ESCALA");
+        u8g2.drawHLine(10, 26, 110);
+
+        u8g2.setFont(u8g2_font_6x12_tr);
+
+        // Al estar en modo edición mostramos el chivato visual, si no, la escala limpia
+        char textoEscala[32];
+        snprintf(textoEscala, sizeof(textoEscala), "> %s", nombresEscalas[config.mpeEscala]);
+        u8g2.drawStr(15, 48, textoEscala);
+        break;
       }
 
     } while (u8g2.nextPage());
