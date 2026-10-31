@@ -1,22 +1,30 @@
 #include "control_bordon.h"
 
-// 🎯 ENLAZADO PERFECTO: Usamos únicamente las funciones reales que existen en tu proyecto
+// Enlazamos las funciones MPE nativas de tu proyecto
 extern void mpeEnviarNotaOn(uint8_t nota, uint8_t velocidad, uint8_t canal);
 extern void mpeEnviarNotaOff(uint8_t nota, uint8_t velocidad, uint8_t canal);
 extern void mpeEnviarPitchBendNormalizado(float valor, uint8_t canal);
 extern void mpeEnviarPresionCanal(uint8_t presion, uint8_t canal);
 
-// Variables de memoria privadas aisladas del módulo
+// Puentes seguros de controladores continuos en tu proyecto
+extern void mpeEnviarRPN(uint8_t parametroMSB, uint8_t parametroLSB, uint8_t valorData, uint8_t canal);
+extern void mpeEnviarCC74(uint8_t valor, uint8_t canal); 
+extern void mpeEnviarCCGenerico(uint8_t numeroCC, uint8_t valor, uint8_t canal); 
+
+// ============================================================================
+// INSTANCIAS DE MEMORIA ÚNICAS Y PRIVADAS DEL MÓDULO
+// ============================================================================
 static EstadoBordon estado = { false, 0, 0.0f };
 static const float ALFA_SQUARE_PRES_BORDON = 0.20f;
 
-// Filtros de repetición locales para no saturar el bus MIDI
+// Filtros de repetición locales para mantener el bus MIDI limpio
 static int ultimoZ_Enviado = -1;
 static int ultimoY_Enviado = -1;
+static int ultimoX_Enviado = -1; 
 
-// ============================================================================
-// IMPLEMENTACIÓN DE FUNCIONES DEL MOTOR MPE
-// ============================================================================
+// 🚀 VARIABLES DEL MOTOR DE VIBRATO (LFO POR SOFTWARE)
+static float faseLFO = 0.0f;
+static unsigned long ultimoTiempoLFO = 0;
 
 void bordon_inicializar() 
 {
@@ -25,14 +33,16 @@ void bordon_inicializar()
     estado.presionFiltrada = 0.0f;
     ultimoZ_Enviado = -1;
     ultimoY_Enviado = -1;
+    ultimoX_Enviado = -1;
+    faseLFO = 0.0f;
+    ultimoTiempoLFO = 0;
 
-    // 🌐 CONFIGURACIÓN DE ZONA MPE REFACTORIZADA (Canal 1 Maestro)
-    // Inicializamos la zona MPE (RPN 00:06) asignando un bloque de 14 canales (2 al 15)
-    mpeEnviarRPN(0, 6, 14, 1);
+    // Blindaje de dos zonas MPE para Ableton (Barra abajo, Bordón fijo arriba)
+    mpeEnviarRPN(0, 6, 4, 1);
+    mpeEnviarRPN(0, 6, 1, 16);
 }
 
-
-void procesarSquareBordonMPE(int yCrudo, int presCruda, int numToques, 
+void procesarSquareBordonMPE(int xCrudo, int yCrudo, int presCruda, int numToques, 
                              uint8_t notaBordonMidi, uint8_t ccY, uint8_t ccZ)
 {
     int minSquarePres = 250; 
@@ -45,55 +55,96 @@ void procesarSquareBordonMPE(int yCrudo, int presCruda, int numToques,
 
     if (numToques > 0)
     {
+        // ============================================================================
         // 1. FILTRADO Y MAPEO CONTINUO MPE
-        // Suavizado de la presión para el colchón
+        // ============================================================================
+        
+        // 🔁 PRESIÓN (Z) -> Aftertouch MPE (0 a 127)
         estado.presionFiltrada = (ALFA_SQUARE_PRES_BORDON * presCruda) + ((1.0f - ALFA_SQUARE_PRES_BORDON) * estado.presionFiltrada);
         int targetPres = map(constrain((int)estado.presionFiltrada, minSquarePres, maxSquarePres), minSquarePres, maxSquarePres, 0, 127);
         uint8_t presionMIDI = (uint8_t)constrain(targetPres, 0, 127);
 
-        // Mapeo vertical (Y) convertido a un rango flotante continuo (-1.0 a 1.0) para el Pitch Bend del colchón
-        // Trill Square tiene una resolución nativa de 1792 en el eje vertical
-        float factorY = (float)constrain(yCrudo, 0, 1792) / 1792.0f;
-        float desvioPitchBend = (factorY * 2.0f) - 1.0f; // Escala el valor para ir desde -1.0 (abajo) hasta +1.0 (arriba)
+        // ↕️ VERTICAL (Y) -> Modulación de textura (ccY de tu menú)
+        int targetY = map(constrain(yCrudo, 0, 1792), 0, 1792, 0, 127);
+        uint8_t ccModulationMIDI = (uint8_t)constrain(targetY, 0, 127);
 
+        // ↔️ HORIZONTAL (X) -> CC 74 MPE (Timbre / Brillo)
+        int targetX = map(constrain(xCrudo, 0, 1792), 0, 1792, 0, 127);
+        uint8_t cc74TimbreMIDI = (uint8_t)constrain(targetX, 0, 127);
+
+        // ============================================================================
         // 2. DISPARO ÚNICO DEL BORDÓN MPE
+        // ============================================================================
         if (!estado.dedoPuesto)
         {
             estado.dedoPuesto = true;
-            estado.notaActiva = notaBordonMidi; 
-            // Usamos el canal 3 de forma fija para que actúe como una zona independiente en Ableton
-            mpeEnviarNotaOn(estado.notaActiva, 100, 3); 
+            estado.notaActiva = (uint8_t)notaBordonMidi; 
+            
+            faseLFO = 0.0f; // Reinicia el ciclo para que empiece centrado
+            ultimoTiempoLFO = millis();
+            
+            mpeEnviarPitchBendNormalizado(0.0f, 15);
+            mpeEnviarNotaOn(estado.notaActiva, 100, 15); // Canal 15 (Protegido)
         }
 
-        // 3. ENVÍO DE CONTROLES CONTINUOS NATIVOS MPE (Canal 3)
-        // Presión del colchón (Z) vía Aftertouch/Channel Pressure MPE
+        // ============================================================================
+        // 3. GENERADOR DE VIBRATO ORGÁNICO AUTOMÁTICO (LFO)
+        // ============================================================================
+        unsigned long tiempoActual = millis();
+        float deltaTiempo = (tiempoActual - ultimoTiempoLFO) / 1000.0f; // Pasar a segundos
+        ultimoTiempoLFO = tiempoActual;
+
+        // 🎛️ VELOCIDAD DEL VIBRATO: 6.0f Hz (6 oscilaciones por segundo, muy natural)
+        faseLFO += 2.0f * PI * 6.0f * deltaTiempo;
+        if (faseLFO > 2.0f * PI) faseLFO -= 2.0f * PI;
+
+        // 🎛️ INTENSIDAD DEL VIBRATO: Crece dinámicamente con la presión del dedo (Z)
+        // El factor 0.015f crea una micro-desafinación acústica preciosa sin llegar a desafinar del todo
+        float factorPresion = (float)presionMIDI / 127.0f; 
+        float amplitudVibrato = factorPresion * 0.015f; 
+
+        // Calculamos la onda de vaivén y la inyectamos en el Pitch Bend continuamente
+        float desvioPitchBend = sin(faseLFO) * amplitudVibrato;
+        mpeEnviarPitchBendNormalizado(desvioPitchBend, 15);
+
+        // ============================================================================
+        // 4. ENVÍO DE CONTROLES CONTINUOS FILTRADOS (Canal 15)
+        // ============================================================================
         if ((int)presionMIDI != ultimoZ_Enviado) {
             ultimoZ_Enviado = (int)presionMIDI;
-            mpeEnviarPresionCanal(presionMIDI, 3);
+            mpeEnviarPresionCanal(presionMIDI, 15);
         }
         
-        // Movimiento vertical (Y) vía Pitch Bend continuo MPE
-        int chequeoY = (int)(factorY * 127.0f);
-        if (chequeoY != ultimoY_Enviado) {
-            ultimoY_Enviado = chequeoY;
-            mpeEnviarPitchBendNormalizado(desvioPitchBend, 3);
+        if ((int)ccModulationMIDI != ultimoY_Enviado) {
+            ultimoY_Enviado = (int)ccModulationMIDI;
+            mpeEnviarCCGenerico(ccY, ccModulationMIDI, 15); 
+        }
+
+        if ((int)cc74TimbreMIDI != ultimoX_Enviado) {
+            ultimoX_Enviado = (int)cc74TimbreMIDI;
+            mpeEnviarCC74(cc74TimbreMIDI, 15);
         }
     }
     else
     {
-        // 4. APAGADO DEL BORDÓN AL LEVANTAR EL DEDO
+        // ============================================================================
+        // 5. APAGADO DEL BORDÓN AL LEVANTAR EL DEDO
+        // ============================================================================
         if (estado.dedoPuesto)
         {
             estado.dedoPuesto = false;
-            mpeEnviarNotaOff(estado.notaActiva, 0, 3);
+            mpeEnviarNotaOff(estado.notaActiva, 0, 15);
             estado.notaActiva = 0;
             
-            // Retorno limpio a la posición de reposo central y presión cero
-            mpeEnviarPresionCanal(0, 3);
-            mpeEnviarPitchBendNormalizado(0.0f, 3);
+            // Retorno limpio a la afinación neutra perfecta y controles a cero
+            mpeEnviarPitchBendNormalizado(0.0f, 15);
+            mpeEnviarPresionCanal(0, 15);
+            mpeEnviarCC74(0, 15); 
+            mpeEnviarCCGenerico(ccY, 0, 15); 
             
             ultimoZ_Enviado = -1;
             ultimoY_Enviado = -1;
+            ultimoX_Enviado = -1;
         }
     }
 }

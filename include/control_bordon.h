@@ -19,7 +19,7 @@ struct EstadoBordon {
 void bordon_inicializar();
 
 // 🎯 Ahora la función recibe de forma directa lo que necesita para trabajar
-void procesarSquareBordonMPE(int yCrudo, int presCruda, int numToques, 
+void procesarSquareBordonMPE(int xCrudo, int yCrudo, int presCruda, int numToques, 
                              uint8_t notaBordonMidi, uint8_t ccY, uint8_t ccZ);
 
                              

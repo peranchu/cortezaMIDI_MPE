@@ -85,7 +85,7 @@ ConfigMenu config = {
     .mpeNotaBase = 48,    // C3
     .mpeRangoOctavas = 2, // 2 octavas
     .mpeSquareModo = 0,   // Y selecciona la nota
-    .mpeSquareNota = 48,  // C3 si se usa nota fija
+    .mpeSquareNota = 24,  // C3 si se usa nota fija
     .mpeVersion = 1,
     .transposicion = 0, // 👈 NUEVA: Desfase en semitonos (por defecto 0)
 };
@@ -716,4 +716,21 @@ void mpeEnviarRPN(uint8_t parametroMSB, uint8_t parametroLSB, uint8_t valorData,
     MIDI_OBJ.sendControlChange(100, parametroLSB, canal); 
     MIDI_OBJ.sendControlChange(6,   valorData,    canal); 
 }
+/////////////////////////////////////////
 
+// ============================================================================
+// PUENTE SEGURO PARA EL TIMBRE MPE (EJE X)
+// ============================================================================
+void mpeEnviarCC74(uint8_t valor, uint8_t canal)
+{
+    MIDI_OBJ.sendControlChange(74, valor, canal);
+}
+/////////////////////////////////////////
+
+// ============================================================================
+// PUENTE GENÉRICO DE CC PARA TODO EL INSTRUMENTO
+// ============================================================================
+void mpeEnviarCCGenerico(uint8_t numeroCC, uint8_t valor, uint8_t canal)
+{
+    MIDI_OBJ.sendControlChange(numeroCC, valor, canal);
+}

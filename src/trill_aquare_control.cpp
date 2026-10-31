@@ -81,13 +81,16 @@ void actualizarTrillSquare(void)
     // ============================================================================
     if (config.modoMidi == 1) // O el número de índice que use tu menú para activar el MPE
     {
+         // Le pasamos las variables crudas de ambos ejes leídas del sensor físico
+         int xSqCrudo = (numToques > 0) ? trillSquare.touchHorizontalLocation(0) : 0;
          int ySqCrudo = (numToques > 0) ? trillSquare.touchLocation(0) : 0;
         
-        // Calculamos la nota aquí con la transposición aplicada de forma segura
+        // 🎯 La nota base del bordon (24) se desplaza con tu menú (+ transposición) 
+        // pero mantiene las 2 octavas de separación con la barra (48)
         uint8_t notaMidiCalculada = (uint8_t)constrain(config.mpeSquareNota + config.transposicion, 0, 127);
 
         // 🚀 PASAMOS LOS DATOS DIRECTOS: Limpio, seguro y libre de errores de tipo
-        procesarSquareBordonMPE(ySqCrudo, zSqCrudo, numToques, 
+        procesarSquareBordonMPE(xSqCrudo, ySqCrudo, zSqCrudo, numToques, 
                                 notaMidiCalculada, 
                                 (uint8_t)config.trillSquareCC_Y, 
                                 (uint8_t)config.trillSquareCC_Z);  

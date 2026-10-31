@@ -301,9 +301,9 @@ void verificarUI()
           config.mpeBarModo = 0;
         if (config.mpeBarModo < 0)
           config.mpeBarModo = 1;
-        
+
         // 💾 ¡AGREGADO! Guarda automáticamente en la EEPROM al cambiar el modo
-        extern void guardarLimpiosEnEEPROM(); 
+        extern void guardarLimpiosEnEEPROM();
         guardarLimpiosEnEEPROM();
 
         break;
@@ -339,9 +339,26 @@ void verificarUI()
 
       case PANTALLA_MPE_BAR_TRANSPOSICION:
         config.transposicion += diferencia;
-        if (config.transposicion > 12)  config.transposicion = -12; // Da la vuelta al mínimo
-        if (config.transposicion < -12) config.transposicion = 12;  // Da la vuelta al máximo
-        break;  
+        if (config.transposicion > 12)
+          config.transposicion = -12; // Da la vuelta al mínimo
+        if (config.transposicion < -12)
+          config.transposicion = 12; // Da la vuelta al máximo
+        break;
+
+       // 🎯 NUEVA: LÓGICA DE EDICIÓN PARA LA NOTA BASE DEL BORDÓN (SQUARE)
+      case PANTALLA_MPE_SQUARE_NOTA:
+        config.mpeSquareNota += diferencia;
+        // Límites seguros del protocolo MIDI (0 a 127)
+        if (config.mpeSquareNota > 127)
+          config.mpeSquareNota = 0;
+        if (config.mpeSquareNota < 0)
+          config.mpeSquareNota = 127;
+
+        // 💾 Guardamos automáticamente en la EEPROM el nuevo valor al girar el encoder
+        extern void guardarLimpiosEnEEPROM();
+        guardarLimpiosEnEEPROM();
+        break; 
+
 
       default:
         break;
@@ -777,13 +794,14 @@ void verificarUI()
 
         u8g2.setFont(u8g2_font_6x12_tr);
 
-       // Forzamos un control estricto de los dos únicos modos posibles
-        if (config.mpeBarModo == 0) 
+        // Forzamos un control estricto de los dos únicos modos posibles
+        if (config.mpeBarModo == 0)
         {
-            u8g2.drawStr(15, 48, "> Ribbon (Continuo)");
-        } else 
+          u8g2.drawStr(15, 48, "> Ribbon (Continuo)");
+        }
+        else
         {
-            u8g2.drawStr(15, 48, "> Keys (Cuant.)");
+          u8g2.drawStr(15, 48, "> Keys (Cuant.)");
         }
         break;
 
@@ -831,26 +849,68 @@ void verificarUI()
         break;
 
       case PANTALLA_MPE_BAR_TRANSPOSICION:
-      u8g2.setFont(u8g2_font_7x14_tf);
-      u8g2.drawStr(10, 22, "MPE TRANSPOSE");
-      u8g2.drawHLine(10, 26, 110);
+        u8g2.setFont(u8g2_font_7x14_tf);
+        u8g2.drawStr(10, 22, "MPE TRANSPOSE");
+        u8g2.drawHLine(10, 26, 110);
 
-      u8g2.setFont(u8g2_font_6x12_tr);
-      char bufferTrans[32]; // Aseguramos la declaración del buffer local
-      if (config.transposicion == 0)
+        u8g2.setFont(u8g2_font_6x12_tr);
+        char bufferTrans[32]; // Aseguramos la declaración del buffer local
+        if (config.transposicion == 0)
+        {
+          snprintf(bufferTrans, sizeof(bufferTrans), "> Centro (0 semit)");
+        }
+        else if (config.transposicion > 0)
+        {
+          snprintf(bufferTrans, sizeof(bufferTrans), "> Subir (+%d semit)", config.transposicion);
+        }
+        else
+        {
+          snprintf(bufferTrans, sizeof(bufferTrans), "> Bajar (%d semit)", config.transposicion);
+        }
+        u8g2.drawStr(15, 48, bufferTrans);
+        break;
+
+        // 🎯 NUEVA: PANTALLA EXCLUSIVA MPE PARA LA NOTA BASE DEL BORDÓN
+      case PANTALLA_MPE_SQUARE_NOTA:
       {
-        snprintf(bufferTrans, sizeof(bufferTrans), "> Centro (0 semit)");
+        u8g2.setFont(u8g2_font_7x14_tf);
+        u8g2.drawStr(6, 15, "BORD NOTA");
+        u8g2.drawHLine(6, 19, 116);
+
+        // Zona inferior reservada para mostrar el valor seleccionado
+        u8g2.drawFrame(6, 46, 116, 17);
+        u8g2.setFont(u8g2_font_6x10_tf);
+        u8g2.drawStr(12, 58, "NOTA:");
+
+        // Dibujamos el valor de la nota aplicando tu filtro de parpadeo en modo edición
+        if (!modoEdicionActivo || estadoParpadeo)
+        {
+          u8g2.setFont(u8g2_font_7x14_tf);
+
+          // Mostramos el número MIDI exacto
+          snprintf(bufferTexto, sizeof(bufferTexto), "%d", config.mpeSquareNota);
+          u8g2.drawStr(48, 59, bufferTexto);
+
+          // 💡 Monitor de advertencia visual en tiempo real
+          u8g2.setFont(u8g2_font_6x10_tf);
+          if (config.mpeSquareNota == 24)
+          {
+            u8g2.drawStr(18, 40, "(C0 - SEGURO)");
+          }
+          else if (config.mpeSquareNota == 48)
+          {
+            u8g2.drawStr(18, 40, "(! PISADO !)");
+          }
+          else
+          {
+            // Calcula de forma matemática simple la octava aproximada para orientarte
+            int octava = (config.mpeSquareNota / 12) - 2;
+            snprintf(bufferTexto, sizeof(bufferTexto), "(Oct: %d)", octava);
+            u8g2.drawStr(68, 57, bufferTexto);
+          }
+        }
+        break;
       }
-      else if (config.transposicion > 0)
-      {
-        snprintf(bufferTrans, sizeof(bufferTrans), "> Subir (+%d semit)", config.transposicion);
-      }
-      else
-      {
-        snprintf(bufferTrans, sizeof(bufferTrans), "> Bajar (%d semit)", config.transposicion);
-      }
-      u8g2.drawStr(15, 48, bufferTrans);
-      break;  
       }
 
     } while (u8g2.nextPage());
