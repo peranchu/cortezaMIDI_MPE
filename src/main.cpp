@@ -5,6 +5,7 @@
 #include "trill_bar_control.h"
 #include "trill_square_control.h"
 #include "midi_mpe_control.h"
+#include "control_bordon.h"
 
 // Variables de estado del acelerómetro requeridas por el sistema
 bool mpu_detectado = false;
@@ -48,7 +49,11 @@ void setup()
 
     inicializarTrillSquare();
 
-    // PRUEBA
+    // ============================================================================
+    // 🎯 INTEGRACIÓN DE BORDÓN Y CONFIGURACIÓN DE ZONA MPE PARA ABLETON
+    // ============================================================================
+    // 1. Inicializamos la memoria limpia del módulo independiente del bordón
+    bordon_inicializar(); 
 }
 
 void loop()

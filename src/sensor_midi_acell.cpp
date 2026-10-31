@@ -706,3 +706,14 @@ void cargarLimpiosDesdeEEPROM()
 }
 // - ///////////// - FIN CARGA LIMPIA EEPROM - ///////////
 
+// ============================================================================
+// FUNCIÓN DE ENVÍO RPN GENERICA (Añádela al final de tu midi_mpe_control.cpp)
+// ============================================================================
+void mpeEnviarRPN(uint8_t parametroMSB, uint8_t parametroLSB, uint8_t valorData, uint8_t canal)
+{
+    // Aquí tu archivo puede llamar directamente a usbMIDI o a tu función nativa de CC
+    MIDI_OBJ.sendControlChange(101, parametroMSB, canal); 
+    MIDI_OBJ.sendControlChange(100, parametroLSB, canal); 
+    MIDI_OBJ.sendControlChange(6,   valorData,    canal); 
+}
+

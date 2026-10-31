@@ -277,3 +277,5 @@ void gestionarCambioDeModoMPE(void)
         mpeDesactivarZona();
     }
 }
+///////////////////////////////////////
+
