@@ -4,6 +4,7 @@
 #include "encoder_control.h"
 #include "trill_bar_control.h"
 #include "trill_square_control.h"
+#include "midi_mpe_control.h"
 
 // Variables de estado del acelerómetro requeridas por el sistema
 bool mpu_detectado = false;
@@ -52,7 +53,10 @@ void setup()
 
 void loop()
 {
-    // A. Leer los datos físicos del sensor MPU6050 y procesar la fusión/filtros MIDI
+    // A. Configurar / desactivar la zona MPE cuando el menú cambia de modo
+    gestionarCambioDeModoMPE();
+
+    // B. Leer los datos físicos del sensor MPU6050 y procesar la fusión/filtros MIDI
     leerSensor();
 
     // B. Gestionar los giros del encoder, los parpadeos y actualizar la pantalla OLED

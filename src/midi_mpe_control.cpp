@@ -38,11 +38,9 @@ static uint8_t calcularNotaMpeCuantizada(int posCruda)
 // ================================================================
 void procesarBarMPE(int posCruda, int presCruda, int numToques)
 {
-    // Límites de calibración leídos desde tu estructura config original
     int minFader = (config.trillBarMinPresion <= 0) ? 450 : config.trillBarMinPresion;
     int maxFader = (config.trillBarMaxPresion <= 0) ? 6500 : config.trillBarMaxPresion;
 
-    // Filtro defensivo de despegue antilatigazo exclusivo para el modo MPE
     if (numToques > 0 && presCruda < (minFader - 50))
     {
         numToques = 0;
@@ -50,46 +48,63 @@ void procesarBarMPE(int posCruda, int presCruda, int numToques)
 
     if (numToques > 0)
     {
-        // --- 1. PROCESADO CON DEDO PUESTO ---
-
-        // Filtramos la presión con tu misma inercia analógica
+        // 1. Filtrado y mapeo de presión (Tu lógica intacta)
         barPresionFiltradaMPE = (ALFA_BAR_PRES_MPE * presCruda) + ((1.0f - ALFA_BAR_PRES_MPE) * barPresionFiltradaMPE);
         int targetMidiPres = map(constrain((int)barPresionFiltradaMPE, minFader, maxFader), minFader, maxFader, 0, 127);
         uint8_t presionMIDI = (uint8_t)constrain(targetMidiPres, 0, 127);
 
-        // GESTIÓN DEL ATAQUE (Primer instante de toque)
-        if (!barDedoPuestoMPE)
-        {
-            barDedoPuestoMPE = true;
-            barPuntoInicialXCrudo = posCruda;
-            barUltimoXCrudoConNota = posCruda;
-            barPresionFiltradaMPE = (float)presCruda;
-
-            if (config.mpeBarModo == 0)
-            {
-                // 🔹 MODO CONTINUO (Afinación relativa / Violín)
-                barNotaActualMPE = (uint8_t)constrain(config.mpeNotaBase, 0, 127);
-                mpeEnviarNotaOn(barNotaActualMPE, 100, 2); // Dispara en Canal Miembro 2
-                mpeEnviarPitchBendNormalizado(0.0f, 2);    // Centrado de inicio
-            }
-            else
-            {
-                // 🔸 MODO CUANTIZADO (Notas discretas de la escala)
-                barNotaActualMPE = calcularNotaMpeCuantizada(posCruda);
-                mpeEnviarNotaOn(barNotaActualMPE, 100, 2);
-            }
-        }
-
-        // GESTIÓN DEL DESLIZAMIENTO (Expresión continua)
+        // 2. MODO CONTINUO (RIBBON) TOTALMENTE AUTÓNOMO
         if (config.mpeBarModo == 0)
         {
-            // 🔹 Continuo: Medimos cuánto se desplaza el dedo desde el píxel de ataque inicial
-            float desviacionNormalizada = ((float)posCruda - (float)barPuntoInicialXCrudo) / 3200.0f;
-            mpeEnviarPitchBendNormalizado(desviacionNormalizada, 2);
+            // Calculamos cuántos semitonos reales caben en la barra según tu menú de octavas
+            float totalSemitonosMenu = config.mpeRangoOctavas * 12.0f;
+            
+            // Posición del dedo de 0.0 (izq) a 1.0 (der)
+            float factorPosicion = constrain((float)posCruda / 3200.0f, 0.0f, 1.0f);
+            
+            // Nota flotante exacta: Nota Base + los semitonos que te desplaces
+            float notaFlotanteReal = config.mpeNotaBase + (factorPosicion * totalSemitonosMenu);
+            
+            // La nota MIDI física que enviamos en el Note On es la parte entera
+            uint8_t notaMidiFinal = (uint8_t)constrain((int)notaFlotanteReal, 0, 127);
+            
+            // La fracción sobrante (los decimales) es la desafinación fina entre tecla y tecla
+            float fraccionSemitono = notaFlotanteReal - (int)notaFlotanteReal;
+
+            // En MPE estándar, el Pitch Bend se inicializa a +/-48 semitonos por miembro.
+            // Para movernos exactamente esa fracción de semitono, dividimos por 48.
+            float desvioPitchBendMPE = fraccionSemitono / 48.0f;
+
+            // GESTIÓN DEL ATAQUE O CAMBIO DE NOTA EN CONTINUO
+            if (!barDedoPuestoMPE)
+            {
+                barDedoPuestoMPE = true;
+                barNotaActualMPE = notaMidiFinal;
+                mpeEnviarNotaOn(barNotaActualMPE, 100, 2);
+            }
+            else if (notaMidiFinal != barNotaActualMPE)
+            {
+                // Si el deslizamiento cruza la frontera de un semitono entero, 
+                // hacemos un ligado limpio (legato) para actualizar la nota base en el sinte
+                mpeEnviarNotaOff(barNotaActualMPE, 0, 2);
+                barNotaActualMPE = notaMidiFinal;
+                mpeEnviarNotaOn(barNotaActualMPE, 100, 2);
+            }
+
+            // Enviamos el micro-tono continuo calculado
+            mpeEnviarPitchBendNormalizado(desvioPitchBendMPE, 2);
         }
+        // 3. MODO KEYS (CUANTIZADO)
         else
         {
-            // 🔸 Cuantizado: Cambio de nota (Legato) protegido con histéresis de 40 píxeles
+            if (!barDedoPuestoMPE)
+            {
+                barDedoPuestoMPE = true;
+                barNotaActualMPE = calcularNotaMpeCuantizada(posCruda);
+                mpeEnviarNotaOn(barNotaActualMPE, 100, 2);
+                barUltimoXCrudoConNota = posCruda;
+            }
+
             uint8_t notaCandidata = calcularNotaMpeCuantizada(posCruda);
             if (notaCandidata != barNotaActualMPE && abs(posCruda - barUltimoXCrudoConNota) > 40)
             {
@@ -100,16 +115,13 @@ void procesarBarMPE(int posCruda, int presCruda, int numToques)
             }
         }
 
-        // Enviamos la tercera dimensión MPE (Aftertouch por presión)
         mpeEnviarPresionCanal(presionMIDI, 2);
 
-        // 💡 TEST VISUAL SEGURO: Si el software responde a la presión, encendemos el LED en azul dinámico
         extern void setBoardColor(uint8_t r, uint8_t g, uint8_t b);
         setBoardColor(0, 0, presionMIDI > 10 ? presionMIDI : 10);
     }
     else
     {
-        // --- 2. GESTIÓN DEL DESPEGUE (Release) ---
         if (barDedoPuestoMPE)
         {
             barDedoPuestoMPE = false;
@@ -117,13 +129,10 @@ void procesarBarMPE(int posCruda, int presCruda, int numToques)
 
             if (config.mpeBarModo == 0)
             {
-                mpeEnviarPitchBendNormalizado(0.0f, 2); // Devolvemos el tono al centro por seguridad
+                mpeEnviarPitchBendNormalizado(0.0f, 2); 
             }
             barNotaActualMPE = 0;
-            barPuntoInicialXCrudo = -1;
-            barUltimoXCrudoConNota = -1;
 
-            // 💡 LED apagado (o a color base) al levantar el dedo
             extern void setBoardColor(uint8_t r, uint8_t g, uint8_t b);
             setBoardColor(0, 0, 0); 
         }
@@ -146,5 +155,33 @@ void mpeLimpiarVozBar(void)
         barNotaActualMPE = 0;
         barPuntoInicialXCrudo = -1;
         barUltimoXCrudoConNota = -1;
+    }
+}
+
+// ================================================================
+// CONFIGURACIÓN AUTOMÁTICA DE LA ZONA MPE AL CAMBIAR DE MODO
+// ================================================================
+void gestionarCambioDeModoMPE(void)
+{
+    static int modoAnterior = -1;
+    if (config.modoMidi == modoAnterior)
+        return;
+
+    modoAnterior = config.modoMidi;
+
+    // Al cambiar de modo siempre soltamos la voz del Bar para no dejar
+    // notas colgadas ni pitch bends activos.
+    mpeLimpiarVozBar();
+
+    if (config.modoMidi == 1)
+    {
+        // Zona inferior: master canal 1 + 15 miembros (2..16).
+        // Master +/-2 semitonos, cada miembro +/-48 semitonos.
+        mpeConfigurarZona(15, 2, 48);
+    }
+    else
+    {
+        // MCM = 0: el puerto vuelve a comportarse como MIDI normal.
+        mpeDesactivarZona();
     }
 }

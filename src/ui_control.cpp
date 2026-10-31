@@ -165,50 +165,22 @@ void verificarUI()
 
     if (!modoEdicionActivo && !calibracionEnProgreso)
     {
-      // Avanzamos de 1 en 1 de forma natural con el encoder fino
+      // Avanzamos de 1 en 1 de forma natural con la diferencia del encoder
       int nuevaPantalla = (int)pantallaActiva + diferencia;
 
-      // 🚧 FILTRADO POR BLOQUES GEOMÉTRICOS DEL ENUM
-      if (config.modoMidi == 1) 
+      // 🔄 BUCLE LINEAL ABSOLUTO (Todas las pantallas visibles para siempre)
+      // Si avanza más allá de la última pantalla, vuelve al principio (HOME)
+      if (nuevaPantalla >= TOTAL_PANTALLAS)
       {
-        // 🔸 MODO MPE: El menú termina en PANTALLA_MPE_BAR_NOTA. 
-        // Si intentas avanzar más a la derecha, te manda directo a HOME.
-        if (nuevaPantalla > PANTALLA_MPE_BAR_NOTA) {
-          nuevaPantalla = PANTALLA_HOME;
-        }
-        // Si retrocedes hacia la izquierda por debajo de HOME, va directo a la última de MPE.
-        if (nuevaPantalla < PANTALLA_HOME) {
-          nuevaPantalla = PANTALLA_MPE_BAR_NOTA;
-        }
+        nuevaPantalla = PANTALLA_HOME;
       }
-      else 
+      // Si retrocede por debajo de HOME, salta directamente a la última pantalla
+      else if (nuevaPantalla < PANTALLA_HOME)
       {
-        // 🔹 MODO CC TRADICIONAL: Debe saltarse el bloque MPE que está en medio.
-        if (diferencia > 0) 
-        {
-          // Si vas a la derecha y saltas de MODO_MIDI a la zona MPE, te catapulto directo a los CCs
-          if (nuevaPantalla > PANTALLA_MODO_MIDI && nuevaPantalla < PANTALLA_CC_X) {
-            nuevaPantalla = PANTALLA_CC_X;
-          }
-          // Límite superior del menú: da la vuelta a HOME
-          if (nuevaPantalla >= TOTAL_PANTALLAS) {
-            nuevaPantalla = PANTALLA_HOME;
-          }
-        }
-        else 
-        {
-          // Si vas a la izquierda y retrocedes desde los CCs hacia la zona MPE, te devuelvo a MODO_MIDI
-          if (nuevaPantalla < PANTALLA_CC_X && nuevaPantalla > PANTALLA_MODO_MIDI) {
-            nuevaPantalla = PANTALLA_MODO_MIDI;
-          }
-          // Límite inferior desde HOME: te manda al final absoluto del menú CC
-          if (nuevaPantalla < PANTALLA_HOME) {
-            nuevaPantalla = TOTAL_PANTALLAS - 1;
-          }
-        }
+        nuevaPantalla = TOTAL_PANTALLAS - 1;
       }
 
-      // 🔄 Tu desvío de seguridad original e intacto para la calibración
+      // 🔄 Tu desvío de seguridad original e intacto para la pantalla de calibración
       if (nuevaPantalla == PANTALLA_CALIBRANDO)
       {
         if (pantallaActiva == PANTALLA_ZONA_MUERTA && diferencia > 0)
@@ -216,7 +188,7 @@ void verificarUI()
         else if (pantallaActiva == PANTALLA_CALIBRADO_TRILL_BAR && diferencia < 0)
           nuevaPantalla = PANTALLA_ZONA_MUERTA;
       }
-      
+
       pantallaActiva = (PantallaActual)nuevaPantalla;
     }
 
@@ -224,7 +196,7 @@ void verificarUI()
     {
       switch (pantallaActiva)
       {
-       case PANTALLA_MODO_MIDI:
+      case PANTALLA_MODO_MIDI:
         // Cada paso del encoder alterna entre CC (0) y MPE (1).
         if ((abs(diferencia) % 2) == 1)
           config.modoMidi = (config.modoMidi == 0) ? 1 : 0;
@@ -232,82 +204,116 @@ void verificarUI()
 
       case PANTALLA_CANAL:
         config.canalMidi += diferencia;
-        if (config.canalMidi > 16) config.canalMidi = 1;
-        if (config.canalMidi < 1)  config.canalMidi = 16;
+        if (config.canalMidi > 16)
+          config.canalMidi = 1;
+        if (config.canalMidi < 1)
+          config.canalMidi = 16;
         break;
 
       case PANTALLA_CC_X:
         config.numeroCC_X += diferencia;
-        if (config.numeroCC_X > 127) config.numeroCC_X = 1;
-        if (config.numeroCC_X < 1)   config.numeroCC_X = 127;
+        if (config.numeroCC_X > 127)
+          config.numeroCC_X = 1;
+        if (config.numeroCC_X < 1)
+          config.numeroCC_X = 127;
         break;
 
       case PANTALLA_CC_Y:
         config.numeroCC_Y += diferencia;
-        if (config.numeroCC_Y > 127) config.numeroCC_Y = 1;
-        if (config.numeroCC_Y < 1)   config.numeroCC_Y = 127;
+        if (config.numeroCC_Y > 127)
+          config.numeroCC_Y = 1;
+        if (config.numeroCC_Y < 1)
+          config.numeroCC_Y = 127;
         break;
 
       case PANTALLA_CC_Z:
         config.numeroCC_Z += diferencia;
-        if (config.numeroCC_Z > 127) config.numeroCC_Z = 1;
-        if (config.numeroCC_Z < 1)   config.numeroCC_Z = 127;
+        if (config.numeroCC_Z > 127)
+          config.numeroCC_Z = 1;
+        if (config.numeroCC_Z < 1)
+          config.numeroCC_Z = 127;
         break;
 
       // 🔄 SUBIDAS AQUÍ PARA COINCIDIR CON TU ENUM REAL
       case PANTALLA_CC_TRB_POS:
         config.trillBarCC_pos += diferencia;
-        if (config.trillBarCC_pos > 127) config.trillBarCC_pos = 1;
-        if (config.trillBarCC_pos < 1)   config.trillBarCC_pos = 127;
+        if (config.trillBarCC_pos > 127)
+          config.trillBarCC_pos = 1;
+        if (config.trillBarCC_pos < 1)
+          config.trillBarCC_pos = 127;
         break;
 
       case PANTALLA_CC_TRB_PRES:
         config.trillBarCC_pres += diferencia;
-        if (config.trillBarCC_pres > 127) config.trillBarCC_pres = 1;
-        if (config.trillBarCC_pres < 1)   config.trillBarCC_pres = 127;
+        if (config.trillBarCC_pres > 127)
+          config.trillBarCC_pres = 1;
+        if (config.trillBarCC_pres < 1)
+          config.trillBarCC_pres = 127;
         break;
 
       case PANTALLA_SQUARE_CC_X:
         config.trillSquareCC_X += diferencia;
-        if (config.trillSquareCC_X > 127) config.trillSquareCC_X = 1;
-        if (config.trillSquareCC_X < 1)   config.trillSquareCC_X = 127;
+        if (config.trillSquareCC_X > 127)
+          config.trillSquareCC_X = 1;
+        if (config.trillSquareCC_X < 1)
+          config.trillSquareCC_X = 127;
         break;
 
       case PANTALLA_SQUARE_CC_Y:
         config.trillSquareCC_Y += diferencia;
-        if (config.trillSquareCC_Y > 127) config.trillSquareCC_Y = 1;
-        if (config.trillSquareCC_Y < 1)   config.trillSquareCC_Y = 127;
+        if (config.trillSquareCC_Y > 127)
+          config.trillSquareCC_Y = 1;
+        if (config.trillSquareCC_Y < 1)
+          config.trillSquareCC_Y = 127;
         break;
 
       case PANTALLA_SQUARE_CC_Z:
         config.trillSquareCC_Z += diferencia;
-        if (config.trillSquareCC_Z > 127) config.trillSquareCC_Z = 1;
-        if (config.trillSquareCC_Z < 1)   config.trillSquareCC_Z = 127;
+        if (config.trillSquareCC_Z > 127)
+          config.trillSquareCC_Z = 1;
+        if (config.trillSquareCC_Z < 1)
+          config.trillSquareCC_Z = 127;
         break;
 
       case PANTALLA_SUAVIZADO:
         config.suavizadoAlpha += (diferencia * 5);
-        if (config.suavizadoAlpha > 99) config.suavizadoAlpha = 5;
-        if (config.suavizadoAlpha < 5)  config.suavizadoAlpha = 99;
+        if (config.suavizadoAlpha > 99)
+          config.suavizadoAlpha = 5;
+        if (config.suavizadoAlpha < 5)
+          config.suavizadoAlpha = 99;
         break;
 
       case PANTALLA_ZONA_MUERTA:
         config.zonaMuerta += diferencia;
-        if (config.zonaMuerta > 30) config.zonaMuerta = 0;
-        if (config.zonaMuerta < 0)  config.zonaMuerta = 30;
+        if (config.zonaMuerta > 30)
+          config.zonaMuerta = 0;
+        if (config.zonaMuerta < 0)
+          config.zonaMuerta = 30;
         break;
 
       // 🔹 AGREGADAS LAS TRES PANTALLAS MPE QUE FALTABAN EN ESTE SWITCH
       case PANTALLA_MPE_BAR_MODO:
         // Lógica de edición para tus parámetros MPE (ej: alternar continuo/cuantizado)
+        // Alterna entre 0 (Continuo) y 1 (Cuantizado)
+        config.mpeBarModo += diferencia;
+        if (config.mpeBarModo > 1)  config.mpeBarModo = 0;
+        if (config.mpeBarModo < 0)  config.mpeBarModo = 1;
         break;
 
       case PANTALLA_MPE_BAR_OCTAVAS:
         // Lógica de edición para rango de octavas MPE
+        // Rango típico de octavas para la longitud de la barra (de 1 a 8 octavas)
+        config.mpeRangoOctavas += diferencia;
+        if (config.mpeRangoOctavas > 8) config.mpeRangoOctavas = 1;
+        if (config.mpeRangoOctavas < 1) config.mpeRangoOctavas = 8;
         break;
 
       case PANTALLA_MPE_BAR_NOTA:
         // Lógica de edición para nota base MPE
+        // Nota base MIDI (0 = C-1, 127 = G9). Avanza de 1 en 1 pinchando notas reales
+        config.mpeNotaBase += diferencia;
+        if (config.mpeNotaBase > 127) config.mpeNotaBase = 1;
+        if (config.mpeNotaBase < 0)   config.mpeNotaBase = 127;
         break;
 
       default:
@@ -375,17 +381,25 @@ void verificarUI()
       case PANTALLA_HOME:
       {
         // ================================================================
-        // 1. CABECERA (Tu diseño original intacto)
+        // 1. CABECERA (Mejorada con aviso visual de modo claro CC / MPE)
         // ================================================================
         u8g2.setFont(u8g2_font_6x12_tr);
-        u8g2.drawStr(2, 10, "CORTEZA MIDI");
+        u8g2.drawStr(2, 10, "CORTEZA");
 
-        // 🔬 EL CHIVATO DE CONTROL: Pintamos el valor real de la variable en la esquina
-        snprintf(bufferTexto, sizeof(bufferTexto), "M:%d", config.modoMidi);
-        u8g2.drawStr(80, 10, bufferTexto); 
+        // 💡 AVISO VISUAL DE MODO: Cambiamos el "M:0/1" numérico por un texto legible "CC" o "MPE"
+        if (config.modoMidi == 1)
+        {
+          snprintf(bufferTexto, sizeof(bufferTexto), "[MPE]");
+        }
+        else
+        {
+          snprintf(bufferTexto, sizeof(bufferTexto), "[CC] ");
+        }
+        u8g2.drawStr(58, 10, bufferTexto); // Posicionado limpiamente en la parte central-derecha
 
+        // Canal MIDI (Desplazado ligeramente a la derecha para no pisarse)
         snprintf(bufferTexto, sizeof(bufferTexto), "CH:%d", config.canalMidi);
-        u8g2.drawStr(95, 10, bufferTexto);
+        u8g2.drawStr(96, 10, bufferTexto);
         u8g2.drawHLine(0, 13, 128);
 
         // ================================================================
@@ -418,30 +432,26 @@ void verificarUI()
         u8g2.drawBox(47, 39, anchoBarraZ, 3);
 
         // --- D. Trill Bar POSICIÓN ---
-        // Buscamos la variable de posición del fader lineal (ajusta si se llama diferente)
         int anchoBarraTrillBarPos = map(trillMidiBarPosActual, 0, 127, 0, 36);
         anchoBarraTrillBarPos = constrain(anchoBarraTrillBarPos, 0, 36);
 
-        // 🔄 DINÁMICO: Formateamos la etiqueta para incluir el CC real de la memoria
-        snprintf(bufferTexto, sizeof(bufferTexto), "BP(CC%d)", config.trillBarCC_pos); // 👈 Ajusta el nombre si tu variable del struct se llama diferente
+        snprintf(bufferTexto, sizeof(bufferTexto), "BP(CC%d)", config.trillBarCC_pos);
         u8g2.drawStr(5, 53, bufferTexto);
 
-        u8g2.drawFrame(45, 47, 40, 7); // Mismo grosor estético que las del torso (7px)
+        u8g2.drawFrame(45, 47, 40, 7);
         if (anchoBarraTrillBarPos > 0)
         {
           u8g2.drawBox(47, 49, anchoBarraTrillBarPos, 3);
         }
 
         // --- E. Trill Bar PRESIÓN ---
-        // Aquí usamos tu variable confirmada de presión del fader lineal
         int anchoBarraTrillBarPres = map(trillMidiBarPresActual, 0, 127, 0, 36);
         anchoBarraTrillBarPres = constrain(anchoBarraTrillBarPres, 0, 36);
 
-        // 🔄 DINÁMICO: Formateamos la etiqueta para la presión del fader lineal
-        snprintf(bufferTexto, sizeof(bufferTexto), "BR(CC%d)", config.trillBarCC_pres); // 👈 Ajusta el nombre si tu variable del struct se llama diferente
+        snprintf(bufferTexto, sizeof(bufferTexto), "BR(CC%d)", config.trillBarCC_pres);
         u8g2.drawStr(5, 63, bufferTexto);
 
-        u8g2.drawFrame(45, 57, 40, 7); // Bajada al último hueco disponible de la pantalla
+        u8g2.drawFrame(45, 57, 40, 7);
         if (anchoBarraTrillBarPres > 0)
         {
           u8g2.drawBox(47, 59, anchoBarraTrillBarPres, 3);
@@ -450,20 +460,19 @@ void verificarUI()
         // ================================================================
         // 3. MITAD DERECHA: EL ECOSISTEMA DEL TRILL SQUARE (Estirado verticalmente)
         // ================================================================
-        // Hemos ampliado el Radar XY a un tamaño de 35x35 píxeles aprovechando el hueco libre
         u8g2.drawFrame(92, 17, 35, 35);
 
         int puntoX = map(squareMidiXActual, 0, 127, 0, 31);
-        int puntoY = map(squareMidiYActual, 0, 127, 0, 29); // Invertido para que 127 sea arriba
+        int puntoY = map(squareMidiYActual, 0, 127, 0, 29);
 
         int posXFinal = 92 + 2 + puntoX;
         int posYFinal = 17 + 2 + (29 - puntoY);
 
-        u8g2.drawDisc(posXFinal, posYFinal, 2); // Dedo tocando
+        u8g2.drawDisc(posXFinal, posYFinal, 2);
 
-        // Barra de presión (Z) del Trill Square situada abajo del todo, alineada con B-PRE
+        // Barra de presión (Z) del Trill Square
         int anchoZ = map(squareMidiZActual, 0, 127, 0, 31);
-        u8g2.drawFrame(92, 57, 35, 7); // Caja de presión del Square estilizada de 7px de alto
+        u8g2.drawFrame(92, 57, 35, 7);
         if (anchoZ > 0)
         {
           u8g2.drawBox(94, 59, anchoZ, 3);
@@ -471,6 +480,7 @@ void verificarUI()
 
         break;
       }
+
         // PANTALLA MONITOR TRILL
       case PANTALLA_MONITOR_TRILL:
       {
@@ -730,9 +740,9 @@ void verificarUI()
         break;
       }
 
-      // ================================================================
-      // 🆕 RENDERIZADO GRÁFICO PANTALLAS MPE DE LA BARRA (CORREGIDO)
-      // ================================================================
+      // =========================================
+      // 🆕 RENDERIZADO GRÁFICO PANTALLAS MPE
+      // =========================================
       case PANTALLA_MPE_BAR_MODO:
         u8g2.setFont(u8g2_font_7x14_tf);
         u8g2.drawStr(10, 22, "MPE BAR MODO");
@@ -741,11 +751,11 @@ void verificarUI()
         u8g2.setFont(u8g2_font_6x12_tr);
         if (config.mpeBarModo == 0)
         {
-          u8g2.drawStr(20, 48, "> CONTINUO (Ribbon)");
+          u8g2.drawStr(10, 48, "> Ribbon (Continuo)");
         }
         else
         {
-          u8g2.drawStr(20, 48, "> CUANTIZADO (Keys)");
+          u8g2.drawStr(10, 48, "> Keys (Cuantizado)");
         }
         break;
 
@@ -779,6 +789,7 @@ void verificarUI()
       }
       break;
       }
+
     } while (u8g2.nextPage());
   }
 }

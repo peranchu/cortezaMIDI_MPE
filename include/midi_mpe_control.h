@@ -23,4 +23,10 @@ void procesarBarMPE(int posCruda, int presCruda, int numToques);
  */
 void mpeLimpiarVozBar(void);
 
+/**
+ * @brief Detecta el cambio CC <-> MPE del menú y configura o desactiva la zona
+ *        MPE automaticamente (MCM + rangos de pitch bend). Llamar en cada loop().
+ */
+void gestionarCambioDeModoMPE(void);
+
 #endif // MIDI_MPE_CONTROL_H
